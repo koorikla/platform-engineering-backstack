@@ -4,9 +4,9 @@
 apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
-  name: xmicroservices.platform.hooli.tech
+  name: xmicroservices.sparky.ee
 spec:
-  group: platform.hooli.tech
+  group: sparky.ee
   scope: Namespaced
   names:
     kind: XMicroservice

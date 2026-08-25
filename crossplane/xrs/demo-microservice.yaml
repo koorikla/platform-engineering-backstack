@@ -1,4 +1,4 @@
-apiVersion: platform.hooli.tech/v1alpha1
+apiVersion: sparky.ee/v1alpha1
 kind: XMicroservice
 metadata:
   name: demo-microservice

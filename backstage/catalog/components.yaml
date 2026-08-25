@@ -120,3 +120,17 @@ spec:
   owner: guests
   system: crossview
 
+---
+# kubernetes-ingestor hardcodes `system: "kubernetes-auto-ingested"` on the API
+# entities it generates from XRDs -- it is a string literal in the plugin, not
+# derived from kubernetesIngestor.mappings.systemModel, so no configuration
+# removes it. Defining the System here resolves the relation instead of leaving
+# every generated API entity reporting "This entity has relations to other
+# entities, which can't be found in the catalog".
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: kubernetes-auto-ingested
+  description: Entities discovered from the cluster by kubernetes-ingestor, including the API definitions generated from each Crossplane XRD.
+spec:
+  owner: guests

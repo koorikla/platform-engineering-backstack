@@ -4,10 +4,10 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: xmicroservices.kubernetes.platform.hooli.tech
+  name: xmicroservices.kubernetes.sparky.ee
 spec:
   compositeTypeRef:
-    apiVersion: platform.hooli.tech/v1alpha1
+    apiVersion: sparky.ee/v1alpha1
     kind: XMicroservice
   mode: Pipeline
   pipeline:
