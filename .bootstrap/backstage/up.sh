@@ -30,11 +30,14 @@ fi
 echo "Checking if Backstage image '$IMAGE' already exists..."
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "🔨 Building Backstage image $IMAGE..."
-    cd ./backstage
-    yarn install
-    yarn build:all
-    yarn build-image --tag "$IMAGE" --no-cache
-    cd ..
+    # Multi-stage build: yarn install and the repo build run inside Docker, so
+    # the host needs no Node toolchain. The build compiles native modules
+    # (isolated-vm, better-sqlite3) that only work on the Node major versions
+    # listed under `engines` in backstage/package.json, which is easy to get
+    # wrong on a host with a newer Node on PATH.
+    DOCKER_BUILDKIT=1 docker build ./backstage \
+        -f ./backstage/packages/backend/Dockerfile \
+        --tag "$IMAGE"
 else
     echo "✅ Docker image $IMAGE already exists. Skipping build."
 fi

@@ -1,3 +1,10 @@
+# Validates the user-facing platform API. Under Crossplane v1 that was the
+# namespaced XQueueClaim; under v2 claims are gone and the namespaced XQueue XR
+# is what users create, so the rules match XQueue directly.
+#
+# These rules duplicate the bounds in the XRD's openAPIV3Schema on purpose: the
+# same policies run in CI against the YAML in crossplane/xrs before a PR merges,
+# where no API server is available to enforce the schema.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -10,7 +17,7 @@ spec:
       match:
         resources:
           kinds:
-            - platform.hooli.tech/v1alpha1/XQueueClaim
+            - platform.hooli.tech/v1alpha1/XQueue
       validate:
         message: "Invalid location: only 'EU' or 'US' are allowed in spec.location"
         deny:
@@ -26,7 +33,7 @@ spec:
       match:
         resources:
           kinds:
-            - platform.hooli.tech/v1alpha1/XQueueClaim
+            - platform.hooli.tech/v1alpha1/XQueue
       validate:
         message: "Invalid maxMessageSize: must be between 1024 and 262144 (bytes)"
         deny:
@@ -43,7 +50,7 @@ spec:
       match:
         resources:
           kinds:
-            - platform.hooli.tech/v1alpha1/XQueueClaim
+            - platform.hooli.tech/v1alpha1/XQueue
       validate:
         message: "Invalid visibilityTimeoutSeconds: must be between 0 and 43200 (seconds)"
         deny:

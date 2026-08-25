@@ -1,7 +1,8 @@
 apiVersion: platform.hooli.tech/v1alpha1
-kind: XQueueClaim
+kind: XQueue
 metadata:
   name: cncf-campinas-talk
+  namespace: team-b
 spec:
   location: US
   providerName: default

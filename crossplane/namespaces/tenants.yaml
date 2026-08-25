@@ -1,0 +1,19 @@
+# Tenant namespaces for namespaced XRs.
+#
+# v2 XQueues carry an explicit metadata.namespace, so the namespace has to exist
+# before the XR syncs -- these are applied in an earlier sync wave than
+# crossplane/xrs. Argo CD's CreateNamespace=true only covers an Application's
+# own destination namespace, which is not where tenant XRs land.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+  labels:
+    platform.hooli.tech/tenant: team-a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-b
+  labels:
+    platform.hooli.tech/tenant: team-b

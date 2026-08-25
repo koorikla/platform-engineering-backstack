@@ -1,14 +1,23 @@
-apiVersion: apiextensions.crossplane.io/v1
+# Crossplane v2 composite resource definition.
+#
+# In v1 this XRD was cluster scoped and exposed a namespaced `XQueueClaim` as a
+# proxy. v2 drops claims entirely (`claimNames` is deprecated and unsupported on
+# apiextensions.crossplane.io/v2) -- a namespaced XR *is* the user-facing API, so
+# a team creates an XQueue directly in its own namespace.
+apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
   name: xqueues.platform.hooli.tech
 spec:
   group: platform.hooli.tech
+  scope: Namespaced
   names:
     kind: XQueue
     plural: xqueues
   versions:
     - name: v1alpha1
+      served: true
+      referenceable: true
       schema:
         openAPIV3Schema:
           type: object
@@ -36,8 +45,16 @@ spec:
               required:
                 - location
                 - providerName
-      served: true
-      referenceable: true
-  claimNames:
-    kind: XQueueClaim
-    plural: xqueuesclaim
+      additionalPrinterColumns:
+        - name: LOCATION
+          type: string
+          jsonPath: .spec.location
+        - name: SYNCED
+          type: string
+          jsonPath: .status.conditions[?(@.type=='Synced')].status
+        - name: READY
+          type: string
+          jsonPath: .status.conditions[?(@.type=='Ready')].status
+        - name: AGE
+          type: date
+          jsonPath: .metadata.creationTimestamp

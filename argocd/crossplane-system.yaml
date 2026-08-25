@@ -7,6 +7,9 @@ spec:
   generators:
     - list:
         elements:
+          - name: namespaces
+            path: crossplane/namespaces
+            wave: "0"
           - name: providers
             path: crossplane/providers
             wave: "0"
@@ -22,8 +25,10 @@ spec:
           - name: xrds
             path: crossplane/xrds
             wave: "4"
-          - name: claims
-            path: crossplane/claims
+          # v2 replaces claims with namespaced XRs. These carry their own
+          # metadata.namespace, so they must sync after crossplane/namespaces.
+          - name: xrs
+            path: crossplane/xrs
             wave: "5"
 
   template:

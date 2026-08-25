@@ -62,7 +62,7 @@ This repository brings together essential tools to build and experiment with a l
 
 - **LocalStack**: A fully functional local AWS cloud emulator that enables developers to test and build applications interacting with AWS services without needing a real AWS account.
 
-- **Crossview**: A web-based UI for visualizing and managing Crossplane resources. It provides an intuitive interface to explore XRDs, Compositions, and Claims, helping users understand the control plane structure and accelerate troubleshooting.
+- **Crossview**: A web-based UI for visualizing and managing Crossplane resources. It provides an intuitive interface to explore XRDs, Compositions, and composite resources, helping users understand the control plane structure and accelerate troubleshooting.
 
 - **Helm**: A package manager for Kubernetes that simplifies deploying complex applications using reusable _charts_.
 
@@ -270,7 +270,7 @@ Below is a high-level architecture diagram showing how the components interact:
 
 This section outlines upcoming improvements and planned changes for this project:
 
-- [ ] Reduce the responsibility of the `.bootstrap/**/up.sh` scripts: shift tool installation and configuration to ArgoCD so that it manages not only Crossplane claims but also the cluster setup itself — making the environment closer to real-world GitOps practices.
+- [ ] Reduce the responsibility of the `.bootstrap/**/up.sh` scripts: shift tool installation and configuration to ArgoCD so that it manages not only Crossplane resources but also the cluster setup itself — making the environment closer to real-world GitOps practices.
 
 - [ ] Improve the Kyverno GitHub Action: update the CI pipeline to apply only the policies related to the resources changed in a given Pull Request.
 

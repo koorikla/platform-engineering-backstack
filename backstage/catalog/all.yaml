@@ -6,6 +6,6 @@ metadata:
 spec:
   type: url
   targets:
-    - ./templates/xqueue-claim/template.yaml
+    - ./templates/xqueue/template.yaml
     - ./components.yaml
     - ../examples/org.yaml
