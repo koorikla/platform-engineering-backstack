@@ -27,9 +27,15 @@ spec:
               properties:
                 location:
                   type: string
-                  oneOf:
-                    - pattern: "^EU$"
-                    - pattern: "^US$"
+                  # `enum` rather than `oneOf: [{pattern: ^EU$}, {pattern: ^US$}]`.
+                  # Both accept exactly EU or US, but each oneOf branch carried no
+                  # `type`, so the scaffolder form generated from this schema by
+                  # kubernetes-ingestor failed with "Unsupported field schema for
+                  # field root_location: Unknown field type undefined" instead of
+                  # rendering a dropdown.
+                  enum:
+                    - EU
+                    - US
                 tags:
                   type: object
                   additionalProperties:
