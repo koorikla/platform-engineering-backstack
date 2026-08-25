@@ -45,16 +45,9 @@ spec:
               required:
                 - location
                 - providerName
+      # Only LOCATION here: Crossplane already appends SYNCED, READY,
+      # COMPOSITION and AGE, so repeating them duplicates the columns.
       additionalPrinterColumns:
         - name: LOCATION
           type: string
           jsonPath: .spec.location
-        - name: SYNCED
-          type: string
-          jsonPath: .status.conditions[?(@.type=='Synced')].status
-        - name: READY
-          type: string
-          jsonPath: .status.conditions[?(@.type=='Ready')].status
-        - name: AGE
-          type: date
-          jsonPath: .metadata.creationTimestamp

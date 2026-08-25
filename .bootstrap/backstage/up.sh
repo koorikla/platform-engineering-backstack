@@ -44,9 +44,33 @@ fi
 
 kind load docker-image "$IMAGE" --name "$CLUSTER_NAME"
 
-export $(cat .env | xargs) &&
-    sed "s|<placeholder>|$(echo "$GITHUB_TOKEN" | base64)|" $BASE_DIR/manifests/secrets.yaml |
-    kubectl apply -n $NS -f -
+# `export $(cat .env | xargs)` splits a trailing `# comment` -- or any value
+# containing spaces -- into bare words that export rejects. Because the apply was
+# chained onto it with `&&`, that failure silently skipped creating the secret
+# rather than stopping the script. Sourcing under `set -a` applies normal shell
+# parsing, so comments and quoting behave.
+if [[ ! -f .env ]]; then
+    echo "❌ .env not found in the repo root. It must define GITHUB_TOKEN."
+    exit 1
+fi
+
+set -a
+# shellcheck source=/dev/null
+source ./.env
+set +a
+
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+    echo "❌ GITHUB_TOKEN is not set in .env"
+    exit 1
+fi
+
+# printf rather than echo: echo appends a newline, which would be baked into the
+# base64 and give Backstage a token with a trailing \n. tr strips the line wrap
+# that GNU base64 adds for inputs over 76 chars (macOS base64 does not wrap).
+GITHUB_TOKEN_B64="$(printf '%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+
+sed "s|<placeholder>|$GITHUB_TOKEN_B64|" "$BASE_DIR/manifests/secrets.yaml" |
+    kubectl apply -n "$NS" -f -
 
 # Wait for postgres deployment to be ready
 echo "Waiting for postgres deployment to be ready..."
