@@ -72,11 +72,19 @@ scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
 
 catalog:
+  # The hand-written CrossplaneEntityProvider was replaced by
+  # kubernetes-ingestor, which leaves its previously-ingested entities in the
+  # database owned by a provider that no longer exists. Without this they linger
+  # forever and the catalog logs "Orphaned providers were thus:
+  # 'crossplane-entity-provider'" on every startup.
+  orphanProviderStrategy: delete
   import:
     entityFilename: catalog-info.yaml
     pullRequestBranchName: backstage-integration
   rules:
-    - allow: [Component, System, API, Resource, Location]
+    # kubernetes-ingestor emits Template and API entities per XRD in addition to
+    # the Component/Resource entities for each XR, so both kinds must be allowed.
+    - allow: [Component, System, API, Resource, Location, Template]
   locations:
     # All Templates
     - type: url
@@ -109,6 +117,39 @@ catalog:
     #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/acme-corp.yaml
     #   rules:
     #     - allow: [User, Group]
+
+# @see https://terasky-oss.github.io/backstage-plugins/plugins/kubernetes-ingestor/overview
+kubernetesIngestor:
+  # Ingest from the single kind cluster this stack runs on.
+  allowAllClusters: true
+
+  components:
+    # Only Crossplane resources belong in this catalog. Left enabled, the plugin
+    # would also ingest every Deployment/StatefulSet in the cluster, including
+    # Argo CD's and Kyverno's own workloads.
+    enabled: false
+
+  crossplane:
+    enabled: true
+    claims:
+      # "Claims" is the plugin's historical name for the user-facing resource.
+      # For a v2 XRD (spec.scope: Namespaced) the plugin ingests the XR itself,
+      # since v2 has no claim to proxy through.
+      ingestAllClaims: true
+    xrds:
+      enabled: true
+      # Generate a scaffolder template per XRD rather than hand-maintaining one.
+      ingestAllXRDs: true
+      ingestOnlyAsAPI: false
+      convertDefaultValuesToPlaceholders: true
+      publishPhase:
+        target: github
+        allowedTargets:
+          - github.com
+        git:
+          repoUrl: github.com?repo=backstack&owner=koorikla
+          targetBranch: main
+          branchPrefix: feature/
 
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options

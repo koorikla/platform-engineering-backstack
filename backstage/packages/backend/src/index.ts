@@ -7,12 +7,6 @@
  */
 
 import { createBackend } from '@backstage/backend-defaults';
-import {
-  coreServices,
-  createBackendModule,
-} from '@backstage/backend-plugin-api';
-import { catalogProcessingExtensionPoint } from '@backstage/plugin-catalog-node/alpha';
-import { CrossplaneEntityProvider } from './crossplane-entity-provider';
 
 const backend = createBackend();
 
@@ -69,37 +63,19 @@ backend.add(import('@backstage/plugin-kubernetes-backend'));
 backend.add(import('@backstage/plugin-notifications-backend'));
 backend.add(import('@backstage/plugin-signals-backend'));
 
-export const crossplaneIngestor = createBackendModule({
-  pluginId: 'catalog',
-  moduleId: 'crossplane-ingestor',
-  register(env) {
-    env.registerInit({
-      deps: {
-        config: coreServices.rootConfig,
-        catalog: catalogProcessingExtensionPoint,
-        scheduler: coreServices.scheduler,
-        logger: coreServices.logger,
-      },
-      async init({ catalog, scheduler, logger, config }) {
-        logger.info('Starting crossplane ingestor');
+// Crossplane + Kyverno (TeraSky plugins).
+//
+// kubernetes-ingestor replaces the hand-written CrossplaneEntityProvider that
+// used to live in ./crossplane-entity-provider.ts. It understands Crossplane v2
+// natively -- it branches on the XRD's `spec.scope`, so a Namespaced XRD has its
+// XR kind ingested directly rather than being looked up through the claim that
+// v2 no longer has. It also generates a scaffolder template and an API entity
+// per XRD, which is why the hand-maintained xqueue template is no longer needed.
+backend.add(import('@terasky/backstage-plugin-kubernetes-ingestor'));
 
-        const taskRunner = scheduler.createScheduledTaskRunner({
-          frequency: { seconds: 10 },
-          timeout: { minutes: 10 },
-        });
-
-        const entityProvider = new CrossplaneEntityProvider({
-          logger,
-          config,
-          taskRunner,
-        });
-
-        catalog.addEntityProvider(entityProvider);
-      },
-    });
-  },
-});
-
-backend.add(crossplaneIngestor);
+// Back the frontend plugins' permission checks. Both are required by their
+// respective frontend plugins even though this backend runs an allow-all policy.
+backend.add(import('@terasky/backstage-plugin-crossplane-permissions-backend'));
+backend.add(import('@terasky/backstage-plugin-kyverno-permissions-backend'));
 
 backend.start();
