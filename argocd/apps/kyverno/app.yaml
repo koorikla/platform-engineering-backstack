@@ -13,6 +13,15 @@ spec:
       releaseName: kyverno
       valueFiles:
         - values.yaml
+  # The chart renders `metadata.labels: {}` on its policy CRDs. Kubernetes drops
+  # an empty map on write, so the live object simply has no labels key, and Argo
+  # CD reports all 11 CRDs OutOfSync forever even though every sync succeeds.
+  # The diff is exactly `> labels: {}` and nothing else.
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - .metadata.labels
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno-system

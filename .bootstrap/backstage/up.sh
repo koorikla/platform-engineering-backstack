@@ -69,7 +69,7 @@ fi
 # that GNU base64 adds for inputs over 76 chars (macOS base64 does not wrap).
 GITHUB_TOKEN_B64="$(printf '%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
 
-sed "s|<placeholder>|$GITHUB_TOKEN_B64|" "$BASE_DIR/manifests/secrets.yaml" |
+sed "s|<placeholder>|$GITHUB_TOKEN_B64|" "$BASE_DIR/backstage-secrets.template.yaml" |
     kubectl apply -n "$NS" -f -
 
 # Wait for postgres deployment to be ready

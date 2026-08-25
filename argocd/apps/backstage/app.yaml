@@ -11,15 +11,12 @@ spec:
     path: .bootstrap/backstage/manifests
     directory:
       recurse: true
-  ignoreDifferences:
-    - group: ""
-      kind: Secret
-      name: backstage-secrets
-      namespace: backstage-system
-    - group: ""
-      kind: Secret
-      name: postgres-secrets
-      namespace: backstage-system
+  # The backstage-secrets entry that used to live here never did anything: an
+  # ignoreDifferences rule with no jsonPointers/jqPathExpressions/
+  # managedFieldsManagers selects no fields, so nothing was ignored -- and it
+  # could not have helped anyway, since the failure was the *apply* rejecting
+  # `<placeholder>` as invalid base64, not a diff. That secret is now created
+  # only by up.sh and is no longer part of this Application's source path.
   destination:
     server: https://kubernetes.default.svc
     namespace: backstage-system
