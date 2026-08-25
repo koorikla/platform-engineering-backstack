@@ -119,9 +119,49 @@ catalog:
     #     - allow: [User, Group]
 
 # @see https://terasky-oss.github.io/backstage-plugins/plugins/kubernetes-ingestor/overview
+# @see https://github.com/RoadieHQ/backstage-plugin-argo-cd
+#
+# Reached in-cluster over HTTPS. Argo CD serves a self-signed certificate whose
+# SANs do include argocd-server.argocd-system.svc.cluster.local, so the hostname
+# verifies -- only the issuer is untrusted. up.sh copies Argo CD's tls.crt into
+# backstage-system and the deployment points NODE_EXTRA_CA_CERTS at it, which
+# trusts exactly that one certificate rather than disabling TLS verification
+# process-wide as NODE_TLS_REJECT_UNAUTHORIZED=0 would.
+argocd:
+  username: admin
+  password: ${ARGOCD_PASSWORD}
+  appLocatorMethods:
+    - type: 'config'
+      instances:
+        - name: platform
+          url: https://argocd-server.argocd-system.svc.cluster.local
+          username: admin
+          password: ${ARGOCD_PASSWORD}
+
 kubernetesIngestor:
   # Ingest from the single kind cluster this stack runs on.
   allowAllClusters: true
+
+  # Emit API entities as type "openapi" with a generated OpenAPI spec rather
+  # than the default type "crd", whose definition is the raw CRD YAML.
+  # EntityApiDefinitionCard (already wired into the API entity page) renders an
+  # openapi definition as browsable Swagger UI, so each XRD becomes real
+  # documentation of the platform API instead of a schema dump.
+  ingestAPIsAsCRDs: false
+
+  # Without this the plugin owns entities as "kubernetes-auto-ingested" and
+  # derives a System of the same name, neither of which exists -- every ingested
+  # entity then shows "This entity has relations to other entities, which can't
+  # be found in the catalog". `guests` is the Group defined in examples/org.yaml.
+  defaultOwner: guests
+
+  mappings:
+    # `none` assigns a System only when a resource carries the
+    # terasky.backstage.io/system annotation, and auto-creates no System entity.
+    # The alternatives all synthesise a System reference (from namespace or
+    # cluster name) that nothing in this catalog defines, which is what produced
+    # the dangling system:default/kubernetes-auto-ingested relation.
+    systemModel: none
 
   components:
     # Must stay true. `enabled: false` does not merely filter workloads -- it

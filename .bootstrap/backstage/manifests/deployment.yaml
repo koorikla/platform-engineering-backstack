@@ -40,6 +40,23 @@ spec:
                 secretKeyRef:
                   name: backstage-token
                   key: token
+            # Trust Argo CD's per-cluster self-signed certificate for the
+            # argo-cd plugin, without the blast radius of
+            # NODE_TLS_REJECT_UNAUTHORIZED=0, which would disable verification
+            # for every outbound request including the GitHub API.
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/argocd-ca/argocd-ca.crt
+          volumeMounts:
+            - name: argocd-ca
+              mountPath: /etc/argocd-ca
+              readOnly: true
+      volumes:
+        - name: argocd-ca
+          configMap:
+            name: argocd-ca
+            # Backstage still starts if the bootstrap has not created this yet;
+            # only the Argo CD plugin's TLS verification depends on it.
+            optional: true
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -1,0 +1,57 @@
+# Crossplane v2 composes native Kubernetes resources directly -- no
+# provider-kubernetes and no Object wrapper, which is why this composition works
+# after that provider was removed.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xmicroservices.platform.hooli.tech
+spec:
+  group: platform.hooli.tech
+  scope: Namespaced
+  names:
+    kind: XMicroservice
+    plural: xmicroservices
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                image:
+                  type: string
+                  description: Container image to run, including tag.
+                replicas:
+                  type: integer
+                  description: Number of pod replicas.
+                  minimum: 1
+                  default: 1
+                port:
+                  type: integer
+                  description: Port the container listens on; the Service exposes the same port.
+                  minimum: 1
+                  maximum: 65535
+                  default: 8080
+                serviceType:
+                  type: string
+                  description: Kubernetes Service type.
+                  # enum, not `oneOf: [{pattern: ...}]` -- the scaffolder form
+                  # generated from this schema needs a type on every branch to
+                  # pick a widget. See the location field on the XQueue XRD.
+                  enum:
+                    - ClusterIP
+                    - NodePort
+                  default: ClusterIP
+              required:
+                - image
+      additionalPrinterColumns:
+        - name: IMAGE
+          type: string
+          jsonPath: .spec.image
+        - name: REPLICAS
+          type: integer
+          jsonPath: .spec.replicas

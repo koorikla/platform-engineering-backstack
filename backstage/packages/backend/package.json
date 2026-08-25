@@ -44,6 +44,7 @@
     "@backstage/plugin-signals-backend": "^0.3.18",
     "@backstage/plugin-techdocs-backend": "^2.2.3",
     "@kubernetes/client-node": "^1.1.2",
+    "@roadiehq/backstage-plugin-argo-cd-backend": "^4.8.0",
     "@terasky/backstage-plugin-crossplane-permissions-backend": "^1.1.18",
     "@terasky/backstage-plugin-kubernetes-ingestor": "^4.0.0",
     "@terasky/backstage-plugin-kyverno-permissions-backend": "^1.0.16",

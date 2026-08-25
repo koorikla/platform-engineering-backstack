@@ -70,6 +70,10 @@ import {
   KyvernoCrossplaneOverviewCard,
   KyvernoCrossplanePolicyReportsTable,
 } from '@terasky/backstage-plugin-kyverno-policy-reports';
+import {
+  EntityArgoCDOverviewCard,
+  isArgocdAvailable,
+} from '@roadiehq/backstage-plugin-argo-cd';
 
 // The *Selector* components pick the v1 or v2 implementation from the entity
 // itself, so these tabs work whether an XR came from a legacy claim or a v2
@@ -312,6 +316,18 @@ const defaultEntityPage = (
       title="Policy Reports"
     >
       {kyvernoContent}
+    </EntityLayout.Route>
+
+    <EntityLayout.Route
+      if={isArgocdAvailable}
+      path="/argocd"
+      title="Argo CD"
+    >
+      <Grid container spacing={3} alignItems="stretch">
+        <Grid item md={12} xs={12}>
+          <EntityArgoCDOverviewCard />
+        </Grid>
+      </Grid>
     </EntityLayout.Route>
 
     <EntityLayout.Route

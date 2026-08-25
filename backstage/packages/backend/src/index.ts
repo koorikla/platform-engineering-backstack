@@ -73,6 +73,11 @@ backend.add(import('@backstage/plugin-signals-backend'));
 // per XRD, which is why the hand-maintained xqueue template is no longer needed.
 backend.add(import('@terasky/backstage-plugin-kubernetes-ingestor'));
 
+// Argo CD. The ingestor annotates ingested entities with `argocd/app-name`,
+// which is exactly the annotation this plugin resolves, so Crossplane resources
+// get their Argo CD app surfaced without any extra annotation work.
+backend.add(import('@roadiehq/backstage-plugin-argo-cd-backend'));
+
 // Back the frontend plugins' permission checks. Both are required by their
 // respective frontend plugins even though this backend runs an allow-all policy.
 backend.add(import('@terasky/backstage-plugin-crossplane-permissions-backend'));

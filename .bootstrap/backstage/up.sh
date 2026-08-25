@@ -69,8 +69,33 @@ fi
 # that GNU base64 adds for inputs over 76 chars (macOS base64 does not wrap).
 GITHUB_TOKEN_B64="$(printf '%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
 
-sed "s|<placeholder>|$GITHUB_TOKEN_B64|" "$BASE_DIR/backstage-secrets.template.yaml" |
+# Argo CD admin password. Defaults to the value .bootstrap/argocd/up.sh sets as
+# ARGO_PWD_NEW; override in .env if that is ever changed.
+ARGOCD_PASSWORD="${ARGOCD_PASSWORD:-12345678}"
+ARGOCD_PASSWORD_B64="$(printf '%s' "$ARGOCD_PASSWORD" | base64 | tr -d '\n')"
+
+sed -e "s|<placeholder>|$GITHUB_TOKEN_B64|" \
+    -e "s|<argocd-placeholder>|$ARGOCD_PASSWORD_B64|" \
+    "$BASE_DIR/backstage-secrets.template.yaml" |
     kubectl apply -n "$NS" -f -
+
+# Argo CD signs its API with a self-signed certificate generated per cluster.
+# Its SANs cover argocd-server.argocd-system.svc.cluster.local, so only the
+# issuer is untrusted -- copying the certificate here and pointing
+# NODE_EXTRA_CA_CERTS at it (see manifests/deployment.yaml) trusts that one
+# certificate, instead of switching off TLS verification for every outbound
+# request Backstage makes.
+echo "Copying Argo CD's CA certificate into $NS..."
+if kubectl get secret argocd-secret -n argocd-system >/dev/null 2>&1; then
+    kubectl get secret argocd-secret -n argocd-system -o jsonpath='{.data.tls\.crt}' |
+        base64 --decode >/tmp/argocd-ca.crt
+    kubectl create configmap argocd-ca -n "$NS" \
+        --from-file=argocd-ca.crt=/tmp/argocd-ca.crt \
+        --dry-run=client -o yaml | kubectl apply -f -
+    rm -f /tmp/argocd-ca.crt
+else
+    echo "⚠️  argocd-secret not found; the Argo CD plugin will not be able to verify TLS."
+fi
 
 # Wait for postgres deployment to be ready
 echo "Waiting for postgres deployment to be ready..."

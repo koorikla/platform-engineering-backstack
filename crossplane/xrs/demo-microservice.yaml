@@ -1,0 +1,10 @@
+apiVersion: platform.hooli.tech/v1alpha1
+kind: XMicroservice
+metadata:
+  name: demo-microservice
+  namespace: team-a
+spec:
+  image: ghcr.io/nginxinc/nginx-unprivileged:1.27-alpine
+  replicas: 2
+  port: 8080
+  serviceType: ClusterIP

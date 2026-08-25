@@ -19,8 +19,11 @@ spec:
           - name: functions
             path: crossplane/functions
             wave: "2"
+          # The whole compositions tree, not just aws/ -- the template below
+          # sets directory.recurse, so provider subdirectories (aws/,
+          # kubernetes/, ...) are all picked up.
           - name: compositions
-            path: crossplane/compositions/aws
+            path: crossplane/compositions
             wave: "3"
           - name: xrds
             path: crossplane/xrds

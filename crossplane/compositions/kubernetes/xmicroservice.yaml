@@ -1,0 +1,98 @@
+# Composes a Deployment and a Service straight from the XR. In v1 this needed
+# provider-kubernetes and an Object wrapper per resource; v2 composes native
+# Kubernetes resources directly, and places them in the XR's own namespace.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xmicroservices.kubernetes.platform.hooli.tech
+spec:
+  compositeTypeRef:
+    apiVersion: platform.hooli.tech/v1alpha1
+    kind: XMicroservice
+  mode: Pipeline
+  pipeline:
+    - step: render-workload
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $xr := .observed.composite.resource -}}
+            {{- $spec := $xr.spec -}}
+            {{- $name := $xr.metadata.name -}}
+            {{- $port := $spec.port | default 8080 -}}
+            {{- $replicas := $spec.replicas | default 1 -}}
+
+            {{- /*
+              A Deployment reports Available, not the Ready condition
+              function-auto-ready looks for, so it would otherwise never count as
+              ready and the XR would sit at Creating forever. Derive readiness
+              from the observed replica count instead of asserting ready: "True"
+              unconditionally, so the XR only goes Ready once pods actually are.
+            */ -}}
+            {{- $observed := .observed.resources | default dict -}}
+            {{- $deployed := index $observed "deployment" -}}
+            {{- $available := 0 -}}
+            {{- if $deployed -}}
+            {{-   $available = dig "resource" "status" "availableReplicas" 0 $deployed -}}
+            {{- end -}}
+
+            ---
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+              labels:
+                app.kubernetes.io/name: {{ $name }}
+                app.kubernetes.io/managed-by: crossplane
+              annotations:
+                {{ setResourceNameAnnotation "deployment" }}
+                {{- if ge (int $available) (int $replicas) }}
+                gotemplating.fn.crossplane.io/ready: "True"
+                {{- end }}
+            spec:
+              replicas: {{ $replicas }}
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: {{ $name }}
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: {{ $name }}
+                spec:
+                  containers:
+                    - name: app
+                      image: {{ $spec.image | quote }}
+                      ports:
+                        - name: http
+                          containerPort: {{ $port }}
+
+            ---
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: {{ $name }}
+              labels:
+                app.kubernetes.io/name: {{ $name }}
+                app.kubernetes.io/managed-by: crossplane
+              annotations:
+                {{ setResourceNameAnnotation "service" }}
+                # A Service is functional the moment it exists -- there is no
+                # further condition to wait on.
+                gotemplating.fn.crossplane.io/ready: "True"
+            spec:
+              type: {{ $spec.serviceType | default "ClusterIP" }}
+              selector:
+                app.kubernetes.io/name: {{ $name }}
+              ports:
+                - name: http
+                  port: {{ $port }}
+                  targetPort: http
+                  protocol: TCP
+
+    - step: auto-ready
+      functionRef:
+        name: function-auto-ready
