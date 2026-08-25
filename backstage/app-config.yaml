@@ -124,10 +124,28 @@ kubernetesIngestor:
   allowAllClusters: true
 
   components:
-    # Only Crossplane resources belong in this catalog. Left enabled, the plugin
-    # would also ingest every Deployment/StatefulSet in the cluster, including
-    # Argo CD's and Kyverno's own workloads.
-    enabled: false
+    # Must stay true. `enabled: false` does not merely filter workloads -- it
+    # short-circuits the whole KubernetesEntityProvider and removes everything it
+    # already tracked, so Crossplane XRs stopped being ingested as well and only
+    # the XRD-derived Templates and APIs remained.
+    enabled: true
+
+    # Keep the platform's own machinery out of the catalog while still ingesting
+    # anything in a tenant namespace. The provider's filter is
+    # `!excludedNamespaces.has(namespace)`, so tenant namespaces (team-a, team-b)
+    # pass, so the XQueue XRs a team creates there are ingested.
+    excludedNamespaces:
+      - argocd-system
+      - backstage-system
+      - crossplane-system
+      - crossview-system
+      - kyverno-system
+      - localstack-system
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - local-path-storage
+      - default
 
   crossplane:
     enabled: true
@@ -147,7 +165,7 @@ kubernetesIngestor:
         allowedTargets:
           - github.com
         git:
-          repoUrl: github.com?repo=backstack&owner=koorikla
+          repoUrl: github.com?repo=platform-engineering-backstack&owner=wnqueiroz
           targetBranch: main
           branchPrefix: feature/
 

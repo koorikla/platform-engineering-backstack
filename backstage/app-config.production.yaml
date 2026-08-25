@@ -19,6 +19,21 @@ backend:
   # config options: https://node-postgres.com/apis/client
   database:
     client: pg
+    # Each plugin opens its own connection pool at startup. On a contended host
+    # -- this stack shares a Docker VM with whatever else is running -- acquiring
+    # the first connection can exceed knex's 60s default, and the plugin dies
+    # with "KnexTimeoutError: Timeout acquiring a connection". The backend then
+    # keeps running with that plugin's routes unmounted, which surfaces as 401s
+    # from every authenticated call when it hits `auth`, or 404s from
+    # /api/catalog/* when it hits `catalog` -- with the frontend still serving
+    # 200, so nothing looks wrong. Raising the ceiling lets a slow start finish
+    # rather than fail; it does not mask a genuinely unreachable database, which
+    # fails on connect rather than on acquire.
+    knexConfig:
+      acquireConnectionTimeout: 180000
+      pool:
+        acquireTimeoutMillis: 180000
+        createTimeoutMillis: 60000
     connection:
       host: ${POSTGRES_HOST}
       port: ${POSTGRES_PORT}
