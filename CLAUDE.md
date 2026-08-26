@@ -53,7 +53,7 @@ This is a **Platform Engineering BACK Stack** - a local development environment 
 │   └── analysis-templates/ # The /healthz gate each promotion must pass
 ├── delivery/           # Source the pipeline renders (NOT applied from main)
 │   ├── chart/          # Helm chart: one XMicroservice
-│   └── envs/           # values-<env>.yaml per env, values-cluster.yaml per zone
+│   └── envs/           # values-<env>.yaml per env, values-<zone>.yaml per zone
 ├── kyverno/            # ClusterPolicy definitions
 ├── backstage/          # Backstage monorepo
 │   ├── packages/       # app/ and backend/
@@ -151,7 +151,7 @@ git show origin/stage/prod1-0:manifests.yaml
 # Render a zone the way the pipeline does (chart defaults < env < cluster)
 helm template podinfo ./delivery/chart --namespace prod1-0 \
   -f ./delivery/envs/prod/values-prod.yaml \
-  -f ./delivery/envs/prod/prod1-0/values-cluster.yaml
+  -f ./delivery/envs/prod/values-prod1-0.yaml
 
 # Promote by hand
 kargo promote --project microservice-delivery --stage dev1-0 --freight <id>

@@ -331,16 +331,19 @@ report the zone healthy before the analysis starts.
 
 ```
 delivery/
-├── chart/                            # 1. chart defaults — values.yaml
+├── chart/                        # 1. chart defaults — values.yaml
 └── envs/
     ├── dev/
-    │   ├── values-dev.yaml           # 2. environment policy (replicas: 1)
-    │   ├── dev1-0/values-cluster.yaml  # 3. this zone only (identity, overrides)
-    │   ├── dev1-1/values-cluster.yaml
-    │   └── dev1-2/values-cluster.yaml
-    ├── test/…
-    └── prod/                         #    values-prod.yaml sets replicas: 2
+    │   ├── values-dev.yaml       # 2. environment policy (replicas: 1)
+    │   ├── values-dev1-0.yaml    # 3. one zone only (identity, overrides)
+    │   ├── values-dev1-1.yaml
+    │   └── values-dev1-2.yaml
+    ├── test/                     #    values-test.yaml + values-test1-{0,1,2}.yaml
+    └── prod/                     #    values-prod.yaml sets replicas: 2
 ```
+
+Each file is named for exactly what it configures, so a `-f` chain reads as the
+scope it applies: environment, then zone.
 
 The promoted image tag appears in none of them — it comes from Kargo through
 `setValues` at render time, so no file in `main` can claim a version that is not
@@ -349,7 +352,7 @@ actually deployed. Render any zone exactly the way the pipeline does with:
 ```sh
 helm template podinfo ./delivery/chart --namespace prod1-0 \
   -f ./delivery/envs/prod/values-prod.yaml \
-  -f ./delivery/envs/prod/prod1-0/values-cluster.yaml
+  -f ./delivery/envs/prod/values-prod1-0.yaml
 ```
 
 The nine `stage/*` branches are seeded by `.bootstrap/kargo/up.sh` on first run,

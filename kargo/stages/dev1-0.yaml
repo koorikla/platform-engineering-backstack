@@ -55,7 +55,7 @@ spec:
             namespace: dev1-0
             valuesFiles:
               - ./src/delivery/envs/dev/values-dev.yaml
-              - ./src/delivery/envs/dev/dev1-0/values-cluster.yaml
+              - ./src/delivery/envs/dev/values-dev1-0.yaml
             setValues:
               - key: image.tag
                 value: ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}

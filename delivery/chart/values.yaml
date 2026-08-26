@@ -1,7 +1,7 @@
 # Layer 1 of 3: chart defaults.
 #
 # These hold for every environment and every cluster. Anything that varies
-# belongs one layer down (values-<env>.yaml) or two (values-cluster.yaml), and a
+# belongs one layer down (values-<env>.yaml) or two (values-<zone>.yaml), and a
 # promotion overrides image.tag on top of all three.
 image:
   repository: ghcr.io/stefanprodan/podinfo
@@ -14,7 +14,8 @@ replicas: 1
 port: 9898
 serviceType: ClusterIP
 
-# No defaults: values-cluster.yaml must name the cluster and the zone it renders
+# No defaults: the zone file (values-<zone>.yaml) must name the cluster and the
+# zone it renders
 # for. See the `required` calls in templates/xmicroservice.yaml.
 stage: ""
 zone: ""

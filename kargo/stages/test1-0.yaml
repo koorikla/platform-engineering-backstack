@@ -62,7 +62,7 @@ spec:
             namespace: test1-0
             valuesFiles:
               - ./src/delivery/envs/test/values-test.yaml
-              - ./src/delivery/envs/test/test1-0/values-cluster.yaml
+              - ./src/delivery/envs/test/values-test1-0.yaml
             setValues:
               - key: image.tag
                 value: ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}

@@ -1,14 +1,15 @@
-# Layer 3 of 3: cluster dev1-2 (dev environment, zone eu-north-1c).
+# Layer 3 of 3: cluster dev1-0 (dev environment, zone eu-north-1a).
 #
-# dev1-2 is one of the two zones that fan out from dev1-0.
+# dev1-0 is the canary zone -- Freight lands here first and the other two
+# zones only become eligible once it verifies.
 #
 # The narrowest layer: it wins over the chart defaults and over
-# ../values-dev.yaml, and exists so one zone can deviate without disturbing its
+# values-dev.yaml, and exists so one zone can deviate without disturbing its
 # siblings. Today it declares identity only -- both values become labels on the
 # rendered XR -- and a real deviation (a zone running more replicas while it
 # absorbs traffic from a drained neighbour) would be one more line here.
 #
 # The image tag is deliberately absent from all three layers: the promotion
 # supplies it, so no file in main can drift from what is actually deployed.
-stage: dev1-2
-zone: eu-north-1c
+stage: dev1-0
+zone: eu-north-1a
