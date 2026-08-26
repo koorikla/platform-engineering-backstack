@@ -1,0 +1,8 @@
+# Propagates readiness from composed resources up to the XR. patch-and-transform
+# did this implicitly; a go-templating-only pipeline needs it explicitly.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: Function
+metadata:
+  name: function-auto-ready
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.5.0

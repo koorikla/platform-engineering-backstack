@@ -30,20 +30,47 @@ fi
 echo "Checking if Backstage image '$IMAGE' already exists..."
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "🔨 Building Backstage image $IMAGE..."
-    cd ./backstage
-    yarn install
-    yarn build:all
-    yarn build-image --tag "$IMAGE" --no-cache
-    cd ..
+    # Multi-stage build: yarn install and the repo build run inside Docker, so
+    # the host needs no Node toolchain. The build compiles native modules
+    # (isolated-vm, better-sqlite3) that only work on the Node major versions
+    # listed under `engines` in backstage/package.json, which is easy to get
+    # wrong on a host with a newer Node on PATH.
+    DOCKER_BUILDKIT=1 docker build ./backstage \
+        -f ./backstage/packages/backend/Dockerfile \
+        --tag "$IMAGE"
 else
     echo "✅ Docker image $IMAGE already exists. Skipping build."
 fi
 
 kind load docker-image "$IMAGE" --name "$CLUSTER_NAME"
 
-export $(cat .env | xargs) &&
-    sed "s|<placeholder>|$(echo "$GITHUB_TOKEN" | base64)|" $BASE_DIR/manifests/secrets.yaml |
-    kubectl apply -n $NS -f -
+# `export $(cat .env | xargs)` splits a trailing `# comment` -- or any value
+# containing spaces -- into bare words that export rejects. Because the apply was
+# chained onto it with `&&`, that failure silently skipped creating the secret
+# rather than stopping the script. Sourcing under `set -a` applies normal shell
+# parsing, so comments and quoting behave.
+if [[ ! -f .env ]]; then
+    echo "❌ .env not found in the repo root. It must define GITHUB_TOKEN."
+    exit 1
+fi
+
+set -a
+# shellcheck source=/dev/null
+source ./.env
+set +a
+
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+    echo "❌ GITHUB_TOKEN is not set in .env"
+    exit 1
+fi
+
+# printf rather than echo: echo appends a newline, which would be baked into the
+# base64 and give Backstage a token with a trailing \n. tr strips the line wrap
+# that GNU base64 adds for inputs over 76 chars (macOS base64 does not wrap).
+GITHUB_TOKEN_B64="$(printf '%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+
+sed "s|<placeholder>|$GITHUB_TOKEN_B64|" "$BASE_DIR/backstage-secrets.template.yaml" |
+    kubectl apply -n "$NS" -f -
 
 # Wait for postgres deployment to be ready
 echo "Waiting for postgres deployment to be ready..."

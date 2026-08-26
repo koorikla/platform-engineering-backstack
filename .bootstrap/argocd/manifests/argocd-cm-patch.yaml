@@ -23,8 +23,13 @@ data:
           return false
         end
 
+        -- Crossplane v2 introduced ClusterProviderConfig (group aws.m.upbound.io)
+        -- as the cluster scoped config that namespaced managed resources share.
+        -- It reports only `status.users`, exactly like ProviderConfig, so it has
+        -- to be listed here too -- otherwise it never leaves "Progressing".
         local has_no_status = {
           "ProviderConfig",
+          "ClusterProviderConfig",
           "ProviderConfigUsage"
         }
 
@@ -35,7 +40,7 @@ data:
         end
 
         if obj.status == nil or next(obj.status) == nil or obj.status.conditions == nil then
-          if obj.kind == "ProviderConfig" and obj.status.users ~= nil then
+          if contains(has_no_status, obj.kind) and obj.status.users ~= nil then
             health_status.status = "Healthy"
             health_status.message = "Resource is in use."
             return health_status
@@ -47,3 +52,4 @@ data:
       - "*"
       kinds:
       - ProviderConfigUsage
+      - ClusterProviderConfigUsage

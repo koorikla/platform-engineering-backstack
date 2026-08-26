@@ -1,55 +1,63 @@
+# Composition for the namespaced XQueue XR.
+#
+# Two things changed in the v2 migration:
+#   * the composed Queue moved from `sqs.aws.upbound.io` (cluster scoped) to
+#     `sqs.aws.m.upbound.io` (namespaced). A namespaced XR cannot compose a
+#     cluster scoped managed resource, and Crossplane places the Queue in the
+#     XR's own namespace.
+#   * patch-and-transform was replaced by go-templating, so the mapping is an
+#     ordinary Go template instead of a list of field patches.
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
   name: xqueues.aws.platform.hooli.tech
 spec:
-  mode: Pipeline
-  pipeline:
-    - step: patch-and-transform
-      functionRef:
-        name: function-patch-and-transform
-      input:
-        apiVersion: pt.fn.crossplane.io/v1beta1
-        kind: Resources
-        resources:
-          - name: MainQueue
-            base:
-              apiVersion: sqs.aws.upbound.io/v1beta1
-              kind: Queue
-              metadata:
-                name: crossplane-quickstart-sqs-queue
-              spec:
-                forProvider:
-                  region: us-east-2
-                  tags: {}
-                  visibilityTimeoutSeconds: 30
-                  maxMessageSize: 262144
-                providerConfigRef:
-                  name: default
-            patches:
-              - type: FromCompositeFieldPath
-                fromFieldPath: "spec.location"
-                toFieldPath: "spec.forProvider.region"
-                transforms:
-                  - type: map
-                    map:
-                      EU: "eu-north-1"
-                      US: "us-east-2"
-              - type: FromCompositeFieldPath
-                fromFieldPath: "spec.tags"
-                toFieldPath: "spec.forProvider.tags"
-                policy:
-                  mergeOptions:
-                    strategy: MergeMap
-              - type: FromCompositeFieldPath
-                fromFieldPath: "spec.visibilityTimeoutSeconds"
-                toFieldPath: "spec.forProvider.visibilityTimeoutSeconds"
-              - type: FromCompositeFieldPath
-                fromFieldPath: "spec.maxMessageSize"
-                toFieldPath: "spec.forProvider.maxMessageSize"
-              - type: FromCompositeFieldPath
-                fromFieldPath: "spec.providerName"
-                toFieldPath: "spec.providerConfigRef.name"
   compositeTypeRef:
     apiVersion: platform.hooli.tech/v1alpha1
     kind: XQueue
+  mode: Pipeline
+  pipeline:
+    - step: render-queue
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec -}}
+            apiVersion: sqs.aws.m.upbound.io/v1beta1
+            kind: Queue
+            metadata:
+              annotations:
+                {{ setResourceNameAnnotation "main-queue" }}
+            spec:
+              forProvider:
+                region: {{ index (dict "EU" "eu-north-1" "US" "us-east-2") $spec.location }}
+                {{- with $spec.visibilityTimeoutSeconds }}
+                visibilityTimeoutSeconds: {{ . }}
+                {{- end }}
+                {{- with $spec.maxMessageSize }}
+                maxMessageSize: {{ . }}
+                {{- end }}
+                {{- with $spec.tags }}
+                tags:
+                  {{- range $key, $value := . }}
+                  {{ $key }}: {{ $value | quote }}
+                  {{- end }}
+                {{- end }}
+              providerConfigRef:
+                # Namespaced managed resources may reference either a namespaced
+                # ProviderConfig or a shared ClusterProviderConfig. The LocalStack
+                # config is cluster scoped so every tenant namespace can use it
+                # without a per-namespace copy.
+                kind: ClusterProviderConfig
+                name: {{ $spec.providerName }}
+
+    # go-templating does not derive XR readiness on its own. auto-ready marks the
+    # XQueue Ready once the composed Queue reports Ready, which is what the
+    # Argo CD health check for *.upbound.io resources keys off.
+    - step: auto-ready
+      functionRef:
+        name: function-auto-ready

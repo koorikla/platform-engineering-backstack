@@ -1,7 +1,10 @@
+# v2 of the provider family ships each managed resource twice: the legacy
+# cluster scoped kinds under `sqs.aws.upbound.io`, and namespaced kinds under
+# `sqs.aws.m.upbound.io`. The composition uses the namespaced ones, which is
+# what lets a namespaced XQueue compose a Queue in its own namespace.
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-sqs
-  namespace: crossplane-system
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-sqs:v1
+  package: xpkg.upbound.io/upbound/provider-aws-sqs:v2

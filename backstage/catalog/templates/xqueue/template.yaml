@@ -1,16 +1,16 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: create-xqueue-claim
-  title: Create XQueue Claim
-  description: Creates a Crossplane XQueueClaim and opens a PR with the YAML.
+  name: create-xqueue
+  title: Create XQueue
+  description: Creates a namespaced Crossplane XQueue and opens a PR with the YAML.
 spec:
   owner: guests
   type: infrastructure
 
   parameters:
     - title: Queue Configuration
-      required: [queueName, location, providerName]
+      required: [queueName, namespace, location, providerName]
       properties:
         queueName:
           type: string
@@ -18,6 +18,13 @@ spec:
           pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
           description: Must be in kebab-case (e.g. "my-queue-name")
           errorMessage: Queue name must be in kebab-case, using only lowercase letters, numbers, and hyphens (e.g. "my-queue-name")
+        namespace:
+          type: string
+          title: Namespace
+          description: Tenant namespace the queue is created in. Crossplane v2 XRs are namespaced, and the Queue is provisioned into this same namespace.
+          enum:
+            - team-a
+            - team-b
         location:
           type: string
           title: Location
@@ -50,13 +57,14 @@ spec:
 
   steps:
     - id: fetch-template
-      name: Render local XQueueClaim template
+      name: Render local XQueue manifest
       action: fetch:template
       input:
         url: ./skeleton
         targetPath: ./output
         values:
           queueName: ${{ parameters.queueName }}
+          namespace: ${{ parameters.namespace }}
           location: ${{ parameters.location }}
           providerName: ${{ parameters.providerName }}
           visibilityTimeoutSeconds: ${{ parameters.visibilityTimeoutSeconds }}
@@ -69,13 +77,14 @@ spec:
       input:
         repoUrl: github.com?repo=platform-engineering-backstack&owner=wnqueiroz
         branchName: feature/add-xqueue-${{ parameters.queueName }}
-        title: 'feat(xqueue): add claim for ${{ parameters.queueName }}'
+        title: 'feat(xqueue): add ${{ parameters.queueName }} in ${{ parameters.namespace }}'
         description: |
           This PR was automatically created via [Backstage Scaffolder](https://backstage.io/).
 
-          A new **XQueueClaim** has been scaffolded with the following configuration:
+          A new **XQueue** has been scaffolded with the following configuration:
 
           - **Queue Name**: `${{ parameters.queueName }}`
+          - **Namespace**: `${{ parameters.namespace }}`
           - **Location**: `${{ parameters.location }}`
           - **Provider**: `${{ parameters.providerName }}`
           - **Visibility Timeout**: `${{ parameters.visibilityTimeoutSeconds }}s`
@@ -83,7 +92,7 @@ spec:
 
           > Tags and additional configuration can be found in the generated YAML file.
         sourcePath: ./output
-        targetPath: crossplane/claims
+        targetPath: crossplane/xrs
 
   output:
     links:

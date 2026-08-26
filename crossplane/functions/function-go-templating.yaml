@@ -1,0 +1,9 @@
+# Renders composed resources from a Go template. Replaces
+# function-patch-and-transform, which expressed the same mapping as a list of
+# field patches.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: Function
+metadata:
+  name: function-go-templating
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.0

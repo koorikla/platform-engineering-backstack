@@ -11,9 +11,9 @@ This is a **Platform Engineering BACK Stack** - a local development environment 
 ### High-Level Flow
 
 1. **Backstage** provides developer portal with self-service templates
-2. **Scaffolder templates** create PRs with Crossplane claims
-3. **GitHub Actions** validate claims against Kyverno policies
-4. **ArgoCD** syncs approved claims from Git to Kubernetes cluster
+2. **Scaffolder templates** create PRs with namespaced Crossplane XRs
+3. **GitHub Actions** validate XRs against Kyverno policies
+4. **ArgoCD** syncs approved XRs from Git to Kubernetes cluster
 5. **Crossplane** provisions infrastructure (AWS SQS queues via LocalStack)
 6. **Kyverno** enforces policies at admission time
 
@@ -42,7 +42,8 @@ This is a **Platform Engineering BACK Stack** - a local development environment 
 ├── crossplane/
 │   ├── xrds/           # CompositeResourceDefinitions (platform APIs)
 │   ├── compositions/   # Implementations of XRDs (e.g., AWS SQS)
-│   ├── claims/         # Actual infrastructure requests from users
+│   ├── xrs/            # Actual infrastructure requests from users (namespaced XRs)
+│   ├── namespaces/     # Tenant namespaces the XRs land in
 │   ├── providers/      # Crossplane provider installations
 │   └── providers-config/ # Provider authentication configs
 ├── kyverno/            # ClusterPolicy definitions
@@ -51,7 +52,7 @@ This is a **Platform Engineering BACK Stack** - a local development environment 
 │   ├── catalog/        # Service catalog and templates
 │   ├── app-config.yaml # Main Backstage configuration
 │   └── Makefile        # Helper commands
-└── api-server/         # Example Go app for creating Crossplane claims
+└── api-server/         # Example Go app for creating Crossplane XRs
 
 ```
 
@@ -97,11 +98,11 @@ The Backstage instance requires specific environment configuration:
 # View Crossplane resources
 kubectl get xrd                           # View XRDs (API definitions)
 kubectl get composition                   # View Compositions (implementations)
-kubectl get xqueueclaim -A               # View claims (user requests)
-kubectl get queue.sqs.aws.upbound.io -A  # View actual AWS resources
+kubectl get xqueue -A                    # View XRs (user requests)
+kubectl get queue.sqs.aws.m.upbound.io -A  # View actual AWS resources (namespaced)
 
 # Debug Crossplane issues
-kubectl describe xqueueclaim <name> -n <namespace>  # Check claim status
+kubectl describe xqueue <name> -n <namespace>  # Check XR status
 kubectl logs -n crossplane-system deployment/crossplane  # Check Crossplane logs
 ```
 
@@ -120,8 +121,8 @@ argocd app diff <app-name>         # Show differences
 ### Working with Kyverno
 
 ```bash
-# Validate policies locally against claims
-kyverno apply ./kyverno --resource ./crossplane/claims
+# Validate policies locally against XRs
+kyverno apply ./kyverno --resource ./crossplane/xrs
 
 # View policies in cluster
 kubectl get clusterpolicy
@@ -130,16 +131,16 @@ kubectl describe clusterpolicy validate-xqueue-fields
 
 ## Development Workflows
 
-### Adding a New Crossplane Claim
+### Adding a New Crossplane XR
 
 1. **Via Backstage Template** (Recommended):
    - Navigate to http://localhost:3000/create
-   - Use "Create XQueue Claim" template
+   - Use "Create XQueue" template
    - Fill in form → creates PR automatically
 
 2. **Manually**:
-   - Create YAML in `/crossplane/claims/<name>.yaml`
-   - Validate locally: `kyverno apply ./kyverno --resource ./crossplane/claims`
+   - Create YAML in `/crossplane/xrs/<name>.yaml`, including `metadata.namespace`
+   - Validate locally: `kyverno apply ./kyverno --resource ./crossplane/xrs`
    - Create PR → GitHub Actions validates → Merge → ArgoCD syncs
 
 ### Creating a New Crossplane XRD
@@ -164,7 +165,7 @@ Templates are located in `/backstage/catalog/templates/`. Each template:
 
 - Uses `fetch:template` to render skeleton files
 - Uses `publish:github:pull-request` to create PR
-- Targets `/crossplane/claims` path in the repository
+- Targets `/crossplane/xrs` path in the repository
 
 ## Important Considerations
 
@@ -175,9 +176,30 @@ Templates are located in `/backstage/catalog/templates/`. Each template:
 - Ensure SSH key (`~/.ssh/id_ed25519`) has access to the repository
 - Backstage templates also reference the repository owner/name in template definitions
 
+### Crossplane v2
+
+The stack runs Crossplane v2, which changes the user-facing API in ways that
+matter when editing anything under `/crossplane`:
+
+- **No claims.** `apiextensions.crossplane.io/v2` XRDs set `spec.scope:
+  Namespaced` and users create the XR (`XQueue`) directly in their namespace.
+  `claimNames` is deprecated and does nothing on a v2 XRD.
+- **Namespaced managed resources.** The provider families ship each kind twice:
+  cluster scoped under `sqs.aws.upbound.io` and namespaced under
+  `sqs.aws.m.upbound.io`. A namespaced XR can only compose the namespaced kinds,
+  and Crossplane creates them in the XR's own namespace.
+- **Provider configs.** Namespaced managed resources reference either a
+  namespaced `ProviderConfig` or a shared `ClusterProviderConfig`, both in group
+  `aws.m.upbound.io`. This repo uses a single `ClusterProviderConfig` named
+  `default` so every tenant namespace can share the LocalStack endpoint.
+- **Compositions are still `apiextensions.crossplane.io/v1`** and cluster scoped;
+  only the XRD API changed.
+- Compositions use `function-go-templating` to render composed resources, plus
+  `function-auto-ready` to propagate readiness from the Queue up to the XQueue.
+
 ### Provider Configuration
 
-- Crossplane providers use LocalStack by default (`default` provider config)
+- Crossplane providers use LocalStack by default (`default` ClusterProviderConfig, group `aws.m.upbound.io`)
 - LocalStack endpoint: http://localstack.localstack-system.svc.cluster.local:4566
 - LocalStack credentials are dummy values (test/test) per AWS local development standards
 - To use real AWS: create new provider config, update compositions to reference it
@@ -186,7 +208,7 @@ Templates are located in `/backstage/catalog/templates/`. Each template:
 
 Kyverno policies are enforced in two places:
 
-1. **CI Pipeline** (`.github/workflows/validate-claims.yaml`): Validates claims before merge
+1. **CI Pipeline** (`.github/workflows/validate-xrs.yaml`): Validates XRs before merge
 2. **Admission Control**: Kyverno runs in-cluster and blocks invalid resources
 
 Ensure both are kept in sync. If you modify XRD schemas, update corresponding Kyverno policies.
@@ -199,7 +221,7 @@ Ensure both are kept in sync. If you modify XRD schemas, update corresponding Ky
 - Crossview: `crossview-system`
 - Kyverno: `kyverno-system`
 - LocalStack: `localstack-system`
-- Claims: deployed in namespace specified in claim YAML (e.g., `default`)
+- Tenant XRs: deployed in the namespace specified in the XR YAML (`team-a`, `team-b`)
 
 ## Testing
 
@@ -215,19 +237,19 @@ yarn start
 ### Testing Kyverno Policies
 
 ```bash
-# Test against all claims
-kyverno apply ./kyverno --resource ./crossplane/claims
+# Test against all XRs
+kyverno apply ./kyverno --resource ./crossplane/xrs
 
-# Test against specific claim
-kyverno apply ./kyverno --resource ./crossplane/claims/my-claim.yaml
+# Test against a specific XR
+kyverno apply ./kyverno --resource ./crossplane/xrs/my-queue.yaml
 ```
 
 ### Testing Crossplane Compositions
 
-1. Create a test claim YAML
-2. Apply to cluster: `kubectl apply -f test-claim.yaml`
-3. Watch resources: `kubectl get xqueue,queue -A --watch`
-4. Check events: `kubectl describe xqueueclaim <name> -n <namespace>`
+1. Create a test XR YAML with a `metadata.namespace`
+2. Apply to cluster: `kubectl apply -f test-xqueue.yaml`
+3. Watch resources: `kubectl get xqueue,queue.sqs.aws.m.upbound.io -A --watch`
+4. Check events: `kubectl describe xqueue <name> -n <namespace>`
 
 ## Commit Message Convention
 

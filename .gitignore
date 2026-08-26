@@ -25,3 +25,6 @@ Thumbs.db
 
 .env*
 !.env.example
+
+# Personal Claude Code settings (permissions etc.) - not for the shared repo
+.claude/settings.local.json

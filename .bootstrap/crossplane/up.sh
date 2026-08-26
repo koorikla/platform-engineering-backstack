@@ -13,7 +13,10 @@ fi
 NS=crossplane-system
 BASE_DIR=./crossplane
 MANIFESTS_DIR="$(dirname "$0")/manifests"
-REQUIRED_PROVIDERS=("provider-kubernetes" "provider-aws-sqs")
+# provider-kubernetes was dropped in the v2 migration. provider-family-aws is
+# pulled in as a dependency of provider-aws-sqs and supplies the
+# ClusterProviderConfig CRD the composition references, so wait for it too.
+REQUIRED_PROVIDERS=("provider-family-aws" "provider-aws-sqs")
 TIMEOUT=600
 INTERVAL=5
 ELAPSED=0

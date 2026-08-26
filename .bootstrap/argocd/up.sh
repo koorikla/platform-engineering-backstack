@@ -38,21 +38,36 @@ kubectl patch svc argocd-server -n $NS --patch-file $MANIFESTS_DIR/service.yaml
 kubectl rollout restart deployment argocd-server -n $NS
 kubectl rollout status deployment argocd-server -n $NS
 
-# Start port-forward only if not already active
-if ! lsof -i TCP:$PORT >/dev/null 2>&1; then
-    if kubectl get svc/argocd-server -n "$NS" >/dev/null 2>&1; then
-        echo "Starting port-forward for Argo CD on port $PORT..."
-        nohup kubectl --namespace "$NS" port-forward svc/argocd-server $PORT:443 >/dev/null 2>&1 &
-    else
+# Probe the port rather than just checking that something holds it. The
+# `rollout restart` above kills any existing port-forward along with its pod, but
+# the dying process still owns the socket for a moment -- so an `lsof` check sees
+# the port as busy, skips starting a replacement, and the login below then fails
+# against a forward that is already gone.
+if ! curl -sk --max-time 3 "https://localhost:$PORT/" >/dev/null 2>&1; then
+    if ! kubectl get svc/argocd-server -n "$NS" >/dev/null 2>&1; then
         echo "Argo CD service not found. Skipping port-forward."
         exit 1
     fi
-else
-    echo "Port $PORT is already in use. Assuming port-forward is running."
-fi
 
-# Wait briefly for port-forward to establish
-sleep 5
+    # Only one process can listen on the port, and it just failed the probe.
+    pkill -f "port-forward svc/argocd-server" 2>/dev/null || true
+
+    echo "Starting port-forward for Argo CD on port $PORT..."
+    nohup kubectl --namespace "$NS" port-forward svc/argocd-server $PORT:443 >/dev/null 2>&1 &
+
+    # Wait for it to actually accept connections instead of guessing with sleep.
+    for _ in $(seq 1 30); do
+        curl -sk --max-time 2 "https://localhost:$PORT/" >/dev/null 2>&1 && break
+        sleep 1
+    done
+
+    if ! curl -sk --max-time 3 "https://localhost:$PORT/" >/dev/null 2>&1; then
+        echo "Port-forward on $PORT did not become ready."
+        exit 1
+    fi
+else
+    echo "Port-forward on $PORT is already serving."
+fi
 
 # Get the initial admin password from the secret
 INITIAL_PASSWORD=$(kubectl -n "$NS" get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)

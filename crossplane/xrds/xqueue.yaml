@@ -1,14 +1,23 @@
-apiVersion: apiextensions.crossplane.io/v1
+# Crossplane v2 composite resource definition.
+#
+# In v1 this XRD was cluster scoped and exposed a namespaced `XQueueClaim` as a
+# proxy. v2 drops claims entirely (`claimNames` is deprecated and unsupported on
+# apiextensions.crossplane.io/v2) -- a namespaced XR *is* the user-facing API, so
+# a team creates an XQueue directly in its own namespace.
+apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
   name: xqueues.platform.hooli.tech
 spec:
   group: platform.hooli.tech
+  scope: Namespaced
   names:
     kind: XQueue
     plural: xqueues
   versions:
     - name: v1alpha1
+      served: true
+      referenceable: true
       schema:
         openAPIV3Schema:
           type: object
@@ -18,9 +27,15 @@ spec:
               properties:
                 location:
                   type: string
-                  oneOf:
-                    - pattern: "^EU$"
-                    - pattern: "^US$"
+                  # `enum` rather than `oneOf: [{pattern: ^EU$}, {pattern: ^US$}]`.
+                  # Both accept exactly EU or US, but each oneOf branch carried no
+                  # `type`, so the scaffolder form generated from this schema by
+                  # kubernetes-ingestor failed with "Unsupported field schema for
+                  # field root_location: Unknown field type undefined" instead of
+                  # rendering a dropdown.
+                  enum:
+                    - EU
+                    - US
                 tags:
                   type: object
                   additionalProperties:
@@ -36,8 +51,9 @@ spec:
               required:
                 - location
                 - providerName
-      served: true
-      referenceable: true
-  claimNames:
-    kind: XQueueClaim
-    plural: xqueuesclaim
+      # Only LOCATION here: Crossplane already appends SYNCED, READY,
+      # COMPOSITION and AGE, so repeating them duplicates the columns.
+      additionalPrinterColumns:
+        - name: LOCATION
+          type: string
+          jsonPath: .spec.location

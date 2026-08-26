@@ -57,6 +57,56 @@ import {
   EntityKubernetesContent,
   isKubernetesAvailable,
 } from '@backstage/plugin-kubernetes';
+import {
+  CrossplaneResourceGraphSelector,
+  CrossplaneResourcesTableSelector,
+  CrossplaneOverviewCardSelector,
+  IfCrossplaneResourceGraphAvailable,
+  IfCrossplaneResourcesListAvailable,
+  IfCrossplaneOverviewAvailable,
+  isCrossplaneAvailable,
+} from '@terasky/backstage-plugin-crossplane-resources-frontend';
+import {
+  KyvernoCrossplaneOverviewCard,
+  KyvernoCrossplanePolicyReportsTable,
+} from '@terasky/backstage-plugin-kyverno-policy-reports';
+
+// The *Selector* components pick the v1 or v2 implementation from the entity
+// itself, so these tabs work whether an XR came from a legacy claim or a v2
+// namespaced composite. The Kyverno Crossplane variants report on the composed
+// managed resources, not just the XR -- which is what makes the
+// validate-xqueue-fields policy visible per queue.
+const crossplaneContent = (
+  <Grid container spacing={3} alignItems="stretch">
+    <IfCrossplaneOverviewAvailable>
+      <Grid item md={6} xs={12}>
+        <CrossplaneOverviewCardSelector />
+      </Grid>
+      <Grid item md={6} xs={12}>
+        <KyvernoCrossplaneOverviewCard />
+      </Grid>
+    </IfCrossplaneOverviewAvailable>
+    <IfCrossplaneResourcesListAvailable>
+      <Grid item md={12} xs={12}>
+        <CrossplaneResourcesTableSelector />
+      </Grid>
+    </IfCrossplaneResourcesListAvailable>
+  </Grid>
+);
+
+const crossplaneGraphContent = (
+  <IfCrossplaneResourceGraphAvailable>
+    <CrossplaneResourceGraphSelector />
+  </IfCrossplaneResourceGraphAvailable>
+);
+
+const kyvernoContent = (
+  <Grid container spacing={3} alignItems="stretch">
+    <Grid item md={12} xs={12}>
+      <KyvernoCrossplanePolicyReportsTable />
+    </Grid>
+  </Grid>
+);
 
 const techdocsContent = (
   <EntityTechdocsContent>
@@ -235,6 +285,41 @@ const defaultEntityPage = (
   <EntityLayout>
     <EntityLayout.Route path="/" title="Overview">
       {overviewContent}
+    </EntityLayout.Route>
+
+    {/* Entities ingested by kubernetes-ingestor from an XRD land here, so the
+        Crossplane and Kyverno tabs hang off the default page rather than the
+        service/website ones. `if` keeps them hidden for everything else. */}
+    <EntityLayout.Route
+      if={isCrossplaneAvailable}
+      path="/crossplane-resources"
+      title="Crossplane Resources"
+    >
+      {crossplaneContent}
+    </EntityLayout.Route>
+
+    <EntityLayout.Route
+      if={isCrossplaneAvailable}
+      path="/crossplane-graph"
+      title="Resource Graph"
+    >
+      {crossplaneGraphContent}
+    </EntityLayout.Route>
+
+    <EntityLayout.Route
+      if={isCrossplaneAvailable}
+      path="/kyverno-policy-reports"
+      title="Policy Reports"
+    >
+      {kyvernoContent}
+    </EntityLayout.Route>
+
+    <EntityLayout.Route
+      if={isKubernetesAvailable}
+      path="/kubernetes"
+      title="Kubernetes"
+    >
+      <EntityKubernetesContent />
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/docs" title="Docs">

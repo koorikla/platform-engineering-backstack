@@ -1,0 +1,27 @@
+# Kyverno's controllers only get RBAC for built-in resources out of the box, so
+# applying validate-xqueue-fields logs:
+#
+#   Warning: system:serviceaccount:kyverno-system:kyverno-reports-controller
+#   requires permissions get,list,watch for resource
+#   platform.hooli.tech/v1alpha1/XQueue
+#
+# Admission validation still works (the webhook sees the request payload), but
+# the policy declares `background: true`, and background scanning needs to read
+# existing XQueues. These labels aggregate the rule into the controller roles
+# Kyverno assembles at runtime.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:platform-hooli-tech-xqueues
+  labels:
+    rbac.kyverno.io/aggregate-to-reports-controller: "true"
+    rbac.kyverno.io/aggregate-to-background-controller: "true"
+rules:
+  - apiGroups:
+      - platform.hooli.tech
+    resources:
+      - xqueues
+    verbs:
+      - get
+      - list
+      - watch

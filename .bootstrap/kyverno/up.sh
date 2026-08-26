@@ -24,7 +24,11 @@ kubectl wait deployment/kyverno-admission-controller \
 
 echo "Ensuring all Kyverno pods are ready..."
 while true; do
-    READY=$(kubectl get pods -n "$NS" -o jsonpath='{.items[*].status.containerStatuses[*].ready}' | tr " " "\n" | grep -c false || true)
+    # Restrict to Running pods. Kyverno ships a `kyverno-migrate-resources` Job
+    # whose pod stays Succeeded with its container reporting ready=false forever;
+    # counting every pod in the namespace therefore never reaches zero once that
+    # job has completed, and the wait times out even though Kyverno is healthy.
+    READY=$(kubectl get pods -n "$NS" --field-selector=status.phase=Running -o jsonpath='{.items[*].status.containerStatuses[*].ready}' | tr " " "\n" | grep -c false || true)
     if [[ "$READY" -eq 0 ]]; then
         break
     fi
