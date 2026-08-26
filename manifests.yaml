@@ -1,0 +1,15 @@
+---
+# Source: microservice/templates/xmicroservice.yaml
+apiVersion: sparky.ee/v1alpha1
+kind: XMicroservice
+metadata:
+  name: podinfo
+  namespace: prod1-1
+  labels:
+    platform.hooli.tech/stage: "prod1-1"
+    topology.kubernetes.io/zone: "eu-north-1b"
+spec:
+  image: "ghcr.io/stefanprodan/podinfo:6.7.0"
+  replicas: 2
+  port: 9898
+  serviceType: ClusterIP
