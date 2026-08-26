@@ -42,7 +42,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: git@github.com:wnqueiroz/platform-engineering-backstack.git
+        repoURL: git@github.com:koorikla/platform-engineering-backstack.git
         targetRevision: HEAD
         path: "{{path}}"
         directory:

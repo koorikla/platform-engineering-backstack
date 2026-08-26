@@ -88,7 +88,7 @@ catalog:
   locations:
     # All Templates
     - type: url
-      target: https://github.com/wnqueiroz/platform-engineering-backstack/blob/main/backstage/catalog/all.yaml
+      target: https://github.com/koorikla/platform-engineering-backstack/blob/main/backstage/catalog/all.yaml
       rules:
         - allow: [Template, System, User, Group]
 
@@ -205,7 +205,7 @@ kubernetesIngestor:
         allowedTargets:
           - github.com
         git:
-          repoUrl: github.com?repo=platform-engineering-backstack&owner=wnqueiroz
+          repoUrl: github.com?repo=platform-engineering-backstack&owner=koorikla
           targetBranch: main
           branchPrefix: feature/
 

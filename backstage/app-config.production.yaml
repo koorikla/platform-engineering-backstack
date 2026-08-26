@@ -72,7 +72,7 @@ catalog:
   locations:
     # All Templates
     - type: url
-      target: https://github.com/wnqueiroz/platform-engineering-backstack/blob/main/backstage/catalog/all.yaml
+      target: https://github.com/koorikla/platform-engineering-backstack/blob/main/backstage/catalog/all.yaml
       rules:
         - allow: [Template, System, User, Group]
 

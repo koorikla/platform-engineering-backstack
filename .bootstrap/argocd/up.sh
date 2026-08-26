@@ -15,7 +15,7 @@ BASE_DIR="$(dirname "$0")"
 MANIFESTS_DIR="$BASE_DIR/manifests"
 PORT=8080
 ARGO_PWD_NEW="12345678"
-REPO_URL="git@github.com:wnqueiroz/platform-engineering-backstack.git"
+REPO_URL="git@github.com:koorikla/platform-engineering-backstack.git"
 
 echo "Adding Argo CD Helm repository..."
 helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true

@@ -14,7 +14,7 @@ Follow these steps to contribute effectively:
 1. **Clone the repository**
 
    ```bash
-   git clone git@github.com:wnqueiroz/platform-engineering-backstack.git
+   git clone git@github.com:koorikla/platform-engineering-backstack.git
    cd platform-engineering-backstack
    ```
 
