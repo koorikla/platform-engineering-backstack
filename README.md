@@ -79,7 +79,8 @@ Make sure the following dependencies are installed before running any commands:
 - [`argocd`](https://argo-cd.readthedocs.io/en/stable/cli_installation/) (version v2.14.2 or higher);
 - [`helm`](https://helm.sh/docs/intro/install/) (version v3.17.1 or higher);
 - [`yq`](https://github.com/mikefarah/yq) (version v4.45.1 or higher);
-- [Docker](https://docs.docker.com/engine/install/) (version 27.4.0 or higher).
+- [Docker](https://docs.docker.com/engine/install/) (version 27.4.0 or higher);
+- [`skaffold`](https://skaffold.dev/docs/install/) (version v2.24.0 or higher) — optional, only needed for the Backstage dev loop described below.
 
 > _⚠️ Installation of these basic tools is not covered here as it varies by operating system. The following scripts assume you have each one properly set up._
 

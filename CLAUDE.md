@@ -65,6 +65,7 @@ This is a **Platform Engineering BACK Stack** - a local development environment 
 make up              # Create kind cluster, bootstrap all components
 make down            # Delete kind cluster
 make setup-local-config  # Update Backstage app-config.local.yaml with cluster credentials
+make dev-backstage   # Skaffold rebuild/redeploy loop for in-cluster Backstage
 ```
 
 ### Backstage Development
@@ -91,6 +92,14 @@ The Backstage instance requires specific environment configuration:
 - After running `make up`, run `make setup-local-config` to generate `backstage/app-config.local.yaml` with cluster credentials
 - Start Backstage with `cd backstage && yarn start`
 - Access at http://localhost:3000 (login as Guest)
+
+For iterating on Backstage **as it runs in the cluster** (rather than `yarn start`
+on the host), use `make dev-backstage`. It rebuilds the image, side-loads it into
+kind and rolls the pod on every change. This only works because
+`argocd/apps/backstage/app.yaml` carries an `ignoreDifferences` rule for the
+backstage container's `image` field — Argo CD's `selfHeal` would otherwise revert
+each redeploy. That rule must be pushed to the fork to take effect, since Argo CD
+reads `Application` objects from Git.
 
 ### Working with Crossplane
 

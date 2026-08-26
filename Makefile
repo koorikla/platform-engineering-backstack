@@ -1,5 +1,5 @@
 
-.PHONY: up down check_bins
+.PHONY: up down check_bins setup-local-config dev-backstage
 
 check_bins:
 	@command -v kind >/dev/null 2>&1 || { echo >&2 "kind not found! Please install it before continuing."; exit 1; }
@@ -54,6 +54,23 @@ down: check_bins
 	else \
 		echo "Cluster 'platform' not found. Skipping..."; \
 	fi
+
+# Hot-reload loop for Backstage only -- see skaffold.yaml. Everything else in
+# the stack is installed once by `make up`; this rebuilds the Backstage image on
+# every source change, side-loads it into the kind cluster and rolls the pod.
+#
+# Requires `make up` to have run first, and the ignoreDifferences rule in
+# argocd/apps/backstage/app.yaml to have been pushed -- otherwise Argo CD's
+# selfHeal reverts each redeploy.
+dev-backstage: check_bins
+	@command -v skaffold >/dev/null 2>&1 || { echo >&2 "skaffold not found! Install it from https://skaffold.dev/docs/install/ before continuing."; exit 1; }
+	@echo "Releasing port 3000 from the bootstrap port-forward (skaffold runs its own)..."
+	@pkill -f "port-forward svc/backstage" 2>/dev/null || true
+	@for _ in $$(seq 1 10); do lsof -i TCP:3000 -sTCP:LISTEN >/dev/null 2>&1 || break; sleep 1; done
+# --cleanup=false: `skaffold dev` otherwise deletes what it deployed on Ctrl-C,
+# which here means tearing down the Backstage and postgres Deployments and
+# waiting for Argo CD to notice and put them back.
+	@skaffold dev --cleanup=false
 
 setup-local-config: check_bins
 	@echo "Updating app-config.local.yaml..."

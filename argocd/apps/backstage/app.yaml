@@ -17,6 +17,25 @@ spec:
   # could not have helped anyway, since the failure was the *apply* rejecting
   # `<placeholder>` as invalid base64, not a diff. That secret is now created
   # only by up.sh and is no longer part of this Application's source path.
+
+  # `skaffold dev` (see skaffold.yaml at the repo root) rebuilds the Backstage
+  # image under a content-addressed tag and applies this Deployment with it.
+  # Without this rule that image field diffs against `backstage:latest` from
+  # Git, the Application goes OutOfSync, and selfHeal reverts the pod spec
+  # within seconds -- so the dev loop would appear to work and then silently
+  # undo itself. Only the backstage container's image is ignored: the postgres
+  # container and every other field stay fully under GitOps.
+  #
+  # Note this rule lives in Git and the `apps` Application self-heals the
+  # Application objects themselves, so editing it locally is not enough --
+  # it has to be committed and pushed before `skaffold dev` will stick.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: backstage
+      namespace: backstage-system
+      jqPathExpressions:
+        - .spec.template.spec.containers[] | select(.name == "backstage").image
   destination:
     server: https://kubernetes.default.svc
     namespace: backstage-system

@@ -1,0 +1,68 @@
+apiVersion: skaffold/v4beta14
+kind: Config
+metadata:
+  name: backstage
+
+# A hot-reload loop for the one component in this stack that is actually edited
+# by hand. Everything else -- Argo CD, Crossplane, Kyverno, Kargo, LocalStack,
+# Crossview -- is installed once by `make up` and left alone, so it stays in
+# .bootstrap/*/up.sh. This file deliberately does not try to replace those
+# scripts: Skaffold has no notion of cluster lifecycle, `argocd` CLI login, or
+# the readiness polling those scripts do.
+#
+#   make dev-backstage     # or: skaffold dev --cleanup=false
+#
+# `--cleanup=false` matters: `skaffold dev` deletes whatever it deployed when it
+# exits, which here would tear down the Backstage and postgres Deployments and
+# leave Argo CD to put them back. `make dev-backstage` passes it for you.
+#
+# Requires `make up` to have run first: this deploys only the Backstage
+# Deployment, and relies on the namespace, Services, RBAC, ConfigMap and the
+# backstage-secrets/argocd-ca secrets that the bootstrap created.
+
+build:
+  local:
+    push: false
+    useBuildkit: true
+  # inputDigest hashes the build context, so every source edit produces a new
+  # tag and therefore a new pod spec -- which is what makes the redeploy happen.
+  # The default gitCommit tagger would emit the same `<sha>-dirty` tag for every
+  # edit in a dirty worktree, and the Deployment would never change.
+  tagPolicy:
+    inputDigest: {}
+  artifacts:
+    - image: backstage
+      context: backstage
+      docker:
+        dockerfile: packages/backend/Dockerfile
+
+manifests:
+  # Only the Deployment. The rest of .bootstrap/backstage/manifests is owned by
+  # the `backstage-app` Argo CD Application and needs no local rewriting.
+  # (This file also carries the postgres Deployment; re-applying it unchanged is
+  # a no-op and does not restart it.)
+  rawYaml:
+    - .bootstrap/backstage/manifests/deployment.yaml
+
+deploy:
+  # Pinned rather than inheriting the current context: without this, a stray
+  # `kubectl config use-context` pointing at a real cluster would make
+  # `skaffold dev` deploy Backstage there. An absent context fails loudly, which
+  # is the safe outcome. Restore it with `kind export kubeconfig --name platform`.
+  kubeContext: kind-platform
+  kubectl:
+    defaultNamespace: backstage-system
+  # The Backstage backend is slow to come up on first start (catalog ingestion,
+  # database migrations), and the default 600s deadline is per-deployment.
+  statusCheckDeadlineSeconds: 600
+
+portForward:
+  # Replaces the nohup/lsof port-forward that .bootstrap/backstage/up.sh starts.
+  # Skaffold owns this one for the lifetime of the `skaffold dev` process and
+  # reconnects it across pod restarts. `make dev-backstage` stops the bootstrap
+  # forward first so port 3000 is free.
+  - resourceType: service
+    resourceName: backstage
+    namespace: backstage-system
+    port: 80
+    localPort: 3000
