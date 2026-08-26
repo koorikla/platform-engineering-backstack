@@ -334,12 +334,12 @@ delivery/
 ├── chart/                            # 1. chart defaults — values.yaml
 └── envs/
     ├── dev/
-    │   ├── values-env.yaml           # 2. environment policy (replicas: 1)
+    │   ├── values-dev.yaml           # 2. environment policy (replicas: 1)
     │   ├── dev1-0/values-cluster.yaml  # 3. this zone only (identity, overrides)
     │   ├── dev1-1/values-cluster.yaml
     │   └── dev1-2/values-cluster.yaml
     ├── test/…
-    └── prod/                         #    values-env.yaml sets replicas: 2
+    └── prod/                         #    values-prod.yaml sets replicas: 2
 ```
 
 The promoted image tag appears in none of them — it comes from Kargo through
@@ -348,7 +348,7 @@ actually deployed. Render any zone exactly the way the pipeline does with:
 
 ```sh
 helm template podinfo ./delivery/chart --namespace prod1-0 \
-  -f ./delivery/envs/prod/values-env.yaml \
+  -f ./delivery/envs/prod/values-prod.yaml \
   -f ./delivery/envs/prod/prod1-0/values-cluster.yaml
 ```
 

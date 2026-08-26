@@ -4,7 +4,7 @@
 # zones only become eligible once it verifies.
 #
 # The narrowest layer: it wins over the chart defaults and over
-# ../values-env.yaml, and exists so one zone can deviate without disturbing its
+# ../values-test.yaml, and exists so one zone can deviate without disturbing its
 # siblings. Today it declares identity only -- both values become labels on the
 # rendered XR -- and a real deviation (a zone running more replicas while it
 # absorbs traffic from a drained neighbour) would be one more line here.

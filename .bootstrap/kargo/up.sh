@@ -156,7 +156,7 @@ for STAGE in dev1-0 dev1-1 dev1-2 test1-0 test1-1 test1-2 prod1-0 prod1-1 prod1-
     # The same three layers, in the same order, that the promotion template uses.
     helm template podinfo ./delivery/chart \
         --namespace "$STAGE" \
-        --values "./delivery/envs/$ENV/values-env.yaml" \
+        --values "./delivery/envs/$ENV/values-$ENV.yaml" \
         --values "./delivery/envs/$ENV/$STAGE/values-cluster.yaml" \
         >"$SEED_DIR/manifests.yaml"
     git -C "$SEED_DIR" init -q -b "$BRANCH"

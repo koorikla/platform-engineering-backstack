@@ -34,7 +34,7 @@ jobs:
               # Same chart, same order, same --namespace as kargo/stages/$ZONE.yaml.
               if helm template podinfo ./delivery/chart \
                   --namespace "$ZONE" \
-                  --values "./delivery/envs/$ENV/values-env.yaml" \
+                  --values "./delivery/envs/$ENV/values-$ENV.yaml" \
                   --values "./delivery/envs/$ENV/$ZONE/values-cluster.yaml" \
                   > "/tmp/$ZONE.yaml" 2>"/tmp/$ZONE.err"; then
                 cat "/tmp/$ZONE.yaml" >> $GITHUB_STEP_SUMMARY

@@ -55,7 +55,7 @@ spec:
             releaseName: podinfo
             namespace: dev1-2
             valuesFiles:
-              - ./src/delivery/envs/dev/values-env.yaml
+              - ./src/delivery/envs/dev/values-dev.yaml
               - ./src/delivery/envs/dev/dev1-2/values-cluster.yaml
             setValues:
               - key: image.tag

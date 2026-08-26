@@ -61,7 +61,7 @@ spec:
             releaseName: podinfo
             namespace: prod1-0
             valuesFiles:
-              - ./src/delivery/envs/prod/values-env.yaml
+              - ./src/delivery/envs/prod/values-prod.yaml
               - ./src/delivery/envs/prod/prod1-0/values-cluster.yaml
             setValues:
               - key: image.tag
