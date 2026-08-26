@@ -258,6 +258,7 @@ Applications are exposed via `nohup` + `kubectl port-forward`.
 | Backstage   | [http://localhost:3000](http://localhost:3000) | Enter as a Guest User.                                                                          |
 | Argo CD     | [http://localhost:8080](http://localhost:8080) | Username: `admin` <br/> Password: `12345678`                                                    |
 | Crossview   | [http://localhost:3001](http://localhost:3001) | -                                                                                               |
+| Kargo       | [https://localhost:3002](https://localhost:3002) | Username: `admin` <br/> Password: `admin` <br/> Serves TLS with a self-signed cert.             |
 | Localstack  | [http://localhost:4566](http://localhost:4566) | Manage it via: [https://app.localstack.cloud/instances](https://app.localstack.cloud/instances) |
 
 ## Architecture

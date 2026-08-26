@@ -44,7 +44,7 @@ up: check_bins
 	@echo "Backstage is accessible at http://localhost:3000"
 	@echo "Argo CD is accessible at http://localhost:8080"
 	@echo "Crossview is accessible at http://localhost:3001"
-	@echo "Kargo is accessible at http://localhost:3002 (admin / admin)"
+	@echo "Kargo is accessible at https://localhost:3002 (admin / admin)"
 	@echo "LocalStack is accessible at http://localhost:4566 (Manage through the platform at: https://app.localstack.cloud/instances)"
 
 down: check_bins

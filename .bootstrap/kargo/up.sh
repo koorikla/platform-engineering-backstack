@@ -127,12 +127,13 @@ kubectl apply -f ./kargo/stages
 
 # Probe rather than trust lsof: a port-forward whose pod has gone still owns the
 # socket briefly, which would make a port check report a healthy forward.
-if ! curl -s --max-time 3 "http://localhost:$PORT" >/dev/null 2>&1; then
+if ! curl -sk --max-time 3 "https://localhost:$PORT" >/dev/null 2>&1; then
     pkill -f "port-forward svc/kargo-api" 2>/dev/null || true
     echo "Starting port-forward for the Kargo UI on port $PORT..."
-    nohup kubectl --namespace "$NS" port-forward svc/kargo-api "$PORT":80 >/dev/null 2>&1 &
+    # kargo-api serves TLS on 443 (appProtocol https), not 80.
+    nohup kubectl --namespace "$NS" port-forward svc/kargo-api "$PORT":443 >/dev/null 2>&1 &
     for _ in $(seq 1 30); do
-        curl -s --max-time 2 "http://localhost:$PORT" >/dev/null 2>&1 && break
+        curl -sk --max-time 2 "https://localhost:$PORT" >/dev/null 2>&1 && break
         sleep 1
     done
 else
