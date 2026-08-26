@@ -35,7 +35,14 @@ echo "Installing or upgrading Argo CD..."
 # the manifest cache, sends every Application to Unknown, and makes Kargo's
 # argocd-update step time out waiting for a sync that cannot finish. Five
 # seconds and five failures is still a real health check; it just does not
-# mistake a loaded laptop for a hung process.
+# mistake a busy component for a hung one.
+#
+# It raises tolerance, it does not create CPU. If the host itself is saturated
+# the restarts come back, and the tell is that they are not confined to Argo CD:
+# when localstack, cert-manager-webhook, kyverno and even kube-controller-manager
+# are all restarting, the cluster is starved and no probe setting will fix it.
+# The usual cause on a laptop is a second kind cluster running alongside this
+# one -- `kind get clusters` and `docker stats` will show it.
 helm upgrade --install argocd \
     --namespace "$NS" \
     --force-conflicts \
