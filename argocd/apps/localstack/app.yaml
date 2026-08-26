@@ -13,6 +13,18 @@ spec:
       releaseName: localstack
       valueFiles:
         - values.yaml
+      # `valueFiles` does not resolve against this repository for a chart-repo
+      # source -- it reads the chart's own values.yaml, so
+      # argocd/apps/localstack/values.yaml is silently ignored and the tag has to
+      # be set inline. (argocd/apps/kyverno/values.yaml is ignored for the same
+      # reason.)
+      #
+      # `latest` now resolves to the 2026.x unified image, which exits 55 with
+      # "License activation failed" unless LOCALSTACK_AUTH_TOKEN is set. 4.14.0
+      # is the last community release that starts unlicensed.
+      parameters:
+        - name: image.tag
+          value: "4.14.0"
   destination:
     server: https://kubernetes.default.svc
     namespace: localstack-system
