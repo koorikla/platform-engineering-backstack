@@ -22,8 +22,14 @@ helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
 helm repo update
 
 echo "Installing or upgrading Argo CD..."
+# --force-conflicts because this script patches argocd-cm with kubectl a few
+# lines below. Helm 4 applies server-side, so that patch's field manager owns
+# .data.resource.exclusions, and every later run fails with "conflict with
+# \"kubectl-patch\"" before anything else can happen. The patch is re-applied
+# immediately afterwards, so Helm reclaiming the field first is harmless.
 helm upgrade --install argocd \
     --namespace "$NS" \
+    --force-conflicts \
     --create-namespace argo/argo-cd
 
 echo "Waiting for Argo CD deployment to be ready..."
