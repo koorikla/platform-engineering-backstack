@@ -1,0 +1,22 @@
+# Watches the podinfo image and turns each new tag into a piece of Freight --
+# the unit Kargo promotes from stage to stage.
+#
+# podinfo rather than the nginx image the team-a demo uses: it publishes clean
+# semver tags and serves /healthz, which is what makes the verification gate a
+# real check rather than a formality.
+#
+# imageSelectionStrategy is left at its default (SemVer), so the newest semver
+# tag wins. The Warehouse CRD sets x-kubernetes-preserve-unknown-fields on
+# subscriptions, meaning a misspelled optional field is silently ignored rather
+# than rejected -- so only fields verified against a running Kargo are used here.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: podinfo
+  namespace: microservice-delivery
+spec:
+  interval: 2m
+  subscriptions:
+    - image:
+        repoURL: ghcr.io/stefanprodan/podinfo
+        discoveryLimit: 5

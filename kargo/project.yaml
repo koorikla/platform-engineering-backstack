@@ -1,0 +1,7 @@
+# A Kargo Project owns a namespace of the same name. Warehouses, Stages and
+# Promotions live here; the workloads they promote live in the stage namespaces
+# (dev1-0, dev1-1, tst, prd).
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: microservice-delivery

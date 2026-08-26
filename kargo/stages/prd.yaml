@@ -1,0 +1,55 @@
+# Stage prd. Accepts only Freight that has already been verified in tst.
+#
+# A promotion is a Git commit, not a cluster write: the steps below clone the
+# repo, rewrite spec.image in this stage's XMicroservice, and push. Argo CD then
+# syncs it, so the cluster state still comes from Git and the promotion is
+# auditable in history.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: prd
+  namespace: microservice-delivery
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: podinfo
+      sources:
+        stages:
+          - tst
+
+  promotionTemplate:
+    spec:
+      steps:
+        - uses: git-clone
+          config:
+            repoURL: https://github.com/koorikla/platform-engineering-backstack.git
+            checkout:
+              - branch: main
+                path: ./repo
+
+        - uses: yaml-update
+          config:
+            path: ./repo/crossplane/xrs/stages/prd/podinfo.yaml
+            updates:
+              - key: spec.image
+                value: ${{ imageFrom("ghcr.io/stefanprodan/podinfo").RepoURL }}:${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}
+
+        - uses: git-commit
+          config:
+            path: ./repo
+            message: 'chore(prd): promote podinfo ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}'
+
+        - uses: git-push
+          config:
+            path: ./repo
+
+  # The quality gate. Runs after the promotion lands and decides whether this
+  # Freight becomes eligible for the next stage -- a failure here stops the
+  # rollout rather than merely reporting it.
+  verification:
+    analysisTemplates:
+      - name: podinfo-healthy
+    args:
+      - name: stage-namespace
+        value: prd
