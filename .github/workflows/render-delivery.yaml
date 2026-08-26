@@ -1,0 +1,80 @@
+# The pipeline renders delivery/ on every promotion, so a broken chart or a
+# malformed values file does not surface until Kargo tries to promote -- and
+# then it fails in the Kargo UI rather than in the pull request that caused it.
+# This renders all nine zones the same way the promotion template does.
+name: Render Delivery Manifests
+
+on:
+  pull_request:
+    paths:
+      - "delivery/**"
+      - ".github/workflows/render-delivery.yaml"
+
+jobs:
+  render:
+    name: helm template every zone
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Render each zone through its values chain
+        run: |
+          echo "## 🎯 Rendered delivery manifests" >> $GITHUB_STEP_SUMMARY
+
+          FAILED=0
+          for ENV in dev test prod; do
+            for AZ in 0 1 2; do
+              ZONE="${ENV}1-${AZ}"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### $ZONE" >> $GITHUB_STEP_SUMMARY
+              echo '```yaml' >> $GITHUB_STEP_SUMMARY
+
+              # Same chart, same order, same --namespace as kargo/stages/$ZONE.yaml.
+              if helm template podinfo ./delivery/chart \
+                  --namespace "$ZONE" \
+                  --values "./delivery/envs/$ENV/values-env.yaml" \
+                  --values "./delivery/envs/$ENV/$ZONE/values-cluster.yaml" \
+                  > "/tmp/$ZONE.yaml" 2>"/tmp/$ZONE.err"; then
+                cat "/tmp/$ZONE.yaml" >> $GITHUB_STEP_SUMMARY
+              else
+                FAILED=1
+                cat "/tmp/$ZONE.err" >> $GITHUB_STEP_SUMMARY
+              fi
+
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            done
+          done
+
+          if [[ $FAILED -ne 0 ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ At least one zone failed to render. Every promotion into it would fail the same way." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All nine zones rendered." >> $GITHUB_STEP_SUMMARY
+
+      - name: Check the rendered output looks like Kubernetes resources
+        run: |
+          # Not `kubectl apply --dry-run=client`: that needs a cluster to
+          # resolve XMicroservice against, and CI has none. This checks the part
+          # that can be checked without one -- the rendered branch is applied
+          # verbatim, so an empty or malformed document there is a broken zone.
+          for ENV in dev test prod; do
+            for AZ in 0 1 2; do
+              ZONE="${ENV}1-${AZ}"
+              COUNT=$(yq 'select(.kind != null) | .kind' "/tmp/$ZONE.yaml" | wc -l)
+              if [[ "$COUNT" -eq 0 ]]; then
+                echo "❌ $ZONE rendered no resources"
+                exit 1
+              fi
+              yq -e '.apiVersion and .kind and .metadata.name and .metadata.namespace' \
+                "/tmp/$ZONE.yaml" >/dev/null || {
+                  echo "❌ $ZONE is missing apiVersion, kind or metadata"
+                  exit 1
+                }
+              echo "$ZONE: $COUNT resource(s)"
+            done
+          done
