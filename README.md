@@ -274,9 +274,12 @@ This section outlines upcoming improvements and planned changes for this project
 
 - [ ] Improve the Kyverno GitHub Action: update the CI pipeline to apply only the policies related to the resources changed in a given Pull Request.
 
-- [ ] Evaluate the use of the **TeraSky Kubernetes Ingestor plugin** for Backstage ([link](https://github.com/TeraSky-OSS/backstage-plugins/tree/main/plugins/kubernetes-ingestor)): current integration attempts led to infinite loops, very few users seem to rely on it, and documentation is limited.
+- [x] Evaluate the use of the **TeraSky Kubernetes Ingestor plugin** for Backstage ([link](https://github.com/TeraSky-OSS/backstage-plugins/tree/main/plugins/kubernetes-ingestor)): adopted at `v4.0.0`, replacing the hand-written `CrossplaneEntityProvider`. It understands Crossplane v2 natively — it branches on the XRD's `spec.scope`, so a `Namespaced` XRD has its XR ingested directly rather than through the claim v2 no longer has — and it generates a scaffolder template and an API entity per XRD, so neither has to be hand-maintained. No ingestion loop was observed on this version; documentation is still thin, so two behaviours worth recording:
 
-- [ ] Evaluate the **TeraSky Crossplane Resources plugin** for Backstage ([link](https://github.com/TeraSky-OSS/backstage-plugins/tree/main/plugins/crossplane-resources)): provides a useful UI and presents a compelling case for exposing infrastructure views not just to solution engineers but also to platform engineers. However, it depends on the Kubernetes Ingestor plugin.
+  - `kubernetesIngestor.components.enabled: false` does **not** filter workloads. It short-circuits the whole entity provider and removes everything it had already tracked, which silently stops Crossplane XRs being ingested too. Exclude the platform's own namespaces with `components.excludedNamespaces` instead.
+  - The API entities it generates hardcode `system: kubernetes-auto-ingested` — the value is a string literal in the plugin, not derived from `mappings.systemModel` — so that `System` has to exist in the catalog or every generated entity reports a dangling relation.
+
+- [x] Evaluate the **TeraSky Crossplane Resources plugin** for Backstage ([link](https://github.com/TeraSky-OSS/backstage-plugins/tree/main/plugins/crossplane-resources)): adopted, together with the Kyverno policy-reports plugin and RoadieHQ's Argo CD plugin. Its `*Selector` components resolve the v1 or v2 implementation from the entity itself, so the resource table and graph work for legacy claims and v2 namespaced XRs alike. The tabs are gated on `isCrossplaneAvailable`, so they only appear for Crossplane entities. The dependency on the Kubernetes Ingestor is real — the ingestor supplies the annotations these components read — and is satisfied by the item above.
 
 ## How to Contribute
 
