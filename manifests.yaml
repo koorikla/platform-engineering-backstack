@@ -9,7 +9,7 @@ metadata:
     platform.hooli.tech/stage: "test1-1"
     topology.kubernetes.io/zone: "eu-north-1b"
 spec:
-  image: "ghcr.io/stefanprodan/podinfo:6.7.0"
+  image: "ghcr.io/stefanprodan/podinfo:6.14.1"
   replicas: 1
   port: 9898
   serviceType: ClusterIP
