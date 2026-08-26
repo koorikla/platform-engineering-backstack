@@ -39,6 +39,14 @@ spec:
   owner: guests
 ---
 apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: kargo
+  description: Represents the Kargo system, which promotes container images through the delivery pipeline by rendering manifests onto the per-zone stage branches.
+spec:
+  owner: guests
+---
+apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: backstage
@@ -75,6 +83,13 @@ metadata:
   description: LocalStack simulates AWS cloud services locally, enabling development and testing of infrastructure components without requiring access to real AWS environments.
   annotations:
     backstage.io/kubernetes-id: localstack
+  links:
+    - url: http://localhost:4566
+      title: LocalStack Endpoint
+      icon: dashboard
+    - url: https://app.localstack.cloud/instances
+      title: LocalStack Web App
+      icon: dashboard
 spec:
   type: service
   lifecycle: production
@@ -88,6 +103,10 @@ metadata:
   description: Argo CD Server component responsible for providing the user interface and API server functionalities for managing application deployments through GitOps workflows.
   annotations:
     backstage.io/kubernetes-id: argocd-server
+  links:
+    - url: http://localhost:8080
+      title: Argo CD UI
+      icon: dashboard
 spec:
   type: service
   lifecycle: production
@@ -101,6 +120,10 @@ metadata:
   description: Crossview provides a user-friendly interface for visualizing, managing, and interacting with Crossplane resources across clusters.
   annotations:
     backstage.io/kubernetes-id: crossview
+  links:
+    - url: http://localhost:3001
+      title: Crossview UI
+      icon: dashboard
 spec:
   type: service
   lifecycle: production
@@ -119,6 +142,25 @@ spec:
   lifecycle: production
   owner: guests
   system: crossview
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kargo-api
+  description: Kargo API and UI, which drives the progressive delivery pipeline -- promoting Freight through the dev, test and prod Stages and rendering each zone's manifests to its stage branch.
+  annotations:
+    backstage.io/kubernetes-id: kargo-api
+  links:
+    # https, not http: the API server terminates TLS with a self-signed
+    # certificate, so the browser warns once on first visit.
+    - url: https://localhost:3002
+      title: Kargo UI
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: guests
+  system: kargo
 
 ---
 # kubernetes-ingestor hardcodes `system: "kubernetes-auto-ingested"` on the API
