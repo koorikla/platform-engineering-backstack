@@ -15,6 +15,7 @@ PROJECT_NS=microservice-delivery
 BASE_DIR="$(dirname "$0")"
 KARGO_VERSION=1.11.2
 ROLLOUTS_CHART_VERSION=2.41.1
+CERT_MANAGER_VERSION=v1.21.1
 PORT=3002
 REPO_URL="https://github.com/koorikla/platform-engineering-backstack.git"
 GIT_USERNAME=koorikla
@@ -25,6 +26,29 @@ GIT_USERNAME=koorikla
 # integration when they are missing, so the quality gate would never run and
 # nothing would say why. Only the controller and CRDs are needed -- no Rollout
 # resources are used.
+# Kargo's chart issues its webhook and API server certificates through
+# cert-manager Issuer/Certificate resources. Every tls.selfSignedCert value
+# defaults to true and each one states that cert-manager CRDs must be present;
+# the alternative is supplying certs and a caBundle by hand, which the chart
+# itself advises against. Without it the install fails outright with
+# `no matches for kind "Certificate" in version "cert-manager.io/v1"`.
+echo "Installing cert-manager (Kargo issues its webhook certificates through it)..."
+helm repo add jetstack https://charts.jetstack.io 2>/dev/null || true
+helm repo update jetstack >/dev/null
+helm upgrade --install cert-manager jetstack/cert-manager \
+    --version "$CERT_MANAGER_VERSION" \
+    --namespace cert-manager \
+    --create-namespace \
+    --set crds.enabled=true \
+    --wait --timeout 5m
+
+echo "Waiting for the cert-manager CRDs to be established..."
+kubectl wait --for=condition=established --timeout=120s \
+    crd/certificates.cert-manager.io crd/issuers.cert-manager.io || {
+    echo "❌ cert-manager CRDs did not become established"
+    exit 1
+}
+
 echo "Installing Argo Rollouts (provides the AnalysisTemplate CRD Kargo verifies with)..."
 # Installed from the chart rather than `kubectl apply -f <github release url>`:
 # that fetches over the network with no retry, and a transient GitHub timeout
