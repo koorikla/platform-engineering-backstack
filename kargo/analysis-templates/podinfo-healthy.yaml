@@ -1,0 +1,54 @@
+# The quality gate Kargo runs after each promotion.
+#
+# AnalysisTemplate is an Argo Rollouts kind, not a Kargo one -- Kargo delegates
+# verification to Rollouts' analysis engine, which is why .bootstrap/kargo/up.sh
+# installs the Rollouts CRDs and controller. Kargo's chart self-disables the
+# integration if those CRDs are absent, so the gate would silently never run.
+#
+# The check is deliberately a real one: it calls podinfo's /healthz through the
+# Service that the XMicroservice composition created, in the namespace the
+# promotion just targeted. That exercises the whole chain -- Kargo committed to
+# Git, Argo CD synced, Crossplane composed a Deployment and Service, and pods
+# are actually serving. A bad image fails here and the Freight never becomes
+# eligible for the next stage.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: podinfo-healthy
+  namespace: microservice-delivery
+spec:
+  args:
+    # Supplied per stage by Stage.spec.verification.args.
+    - name: stage-namespace
+
+  metrics:
+    - name: healthz
+      # Three consecutive successes, so a pod that happens to answer once while
+      # the rollout is still settling is not enough to pass the gate.
+      count: 3
+      interval: 15s
+      # No retries: any failed probe fails the analysis and blocks promotion.
+      failureLimit: 0
+      # Give Argo CD and Crossplane time to reconcile before the first probe.
+      initialDelay: 30s
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: probe
+                    image: curlimages/curl:8.11.1
+                    command:
+                      - /bin/sh
+                      - -c
+                    args:
+                      - |
+                        set -eu
+                        URL="http://podinfo.{{args.stage-namespace}}.svc.cluster.local:9898/healthz"
+                        echo "probing $URL"
+                        # --fail makes a non-2xx status a non-zero exit, which is
+                        # what Rollouts reads as a failed metric.
+                        curl --fail --silent --show-error --max-time 10 "$URL"

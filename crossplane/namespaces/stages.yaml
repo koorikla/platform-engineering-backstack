@@ -1,0 +1,28 @@
+# Delivery stages for the Kargo pipeline.
+#
+# Separate from tenants.yaml on purpose: team-a/team-b are tenants, these are
+# environments. They are different axes, and a tenant's queues should not be
+# disturbed by a promotion.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev1-0
+  labels: { platform.hooli.tech/stage: dev1-0, platform.hooli.tech/stage-class: dev }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev1-1
+  labels: { platform.hooli.tech/stage: dev1-1, platform.hooli.tech/stage-class: dev }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tst
+  labels: { platform.hooli.tech/stage: tst, platform.hooli.tech/stage-class: test }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prd
+  labels: { platform.hooli.tech/stage: prd, platform.hooli.tech/stage-class: prod }
