@@ -27,9 +27,28 @@ echo "Installing or upgrading Argo CD..."
 # .data.resource.exclusions, and every later run fails with "conflict with
 # \"kubectl-patch\"" before anything else can happen. The patch is re-applied
 # immediately afterwards, so Helm reclaiming the field first is harmless.
+# The probe overrides are not tuning for its own sake. Every Argo CD component
+# ships a liveness probe with timeoutSeconds: 1, and on a single-node kind
+# cluster running this whole stack -- plus nine Applications each fetching a
+# different branch of the same repo -- the repo-server misses that deadline
+# while it is busy generating manifests. The kubelet then kills it, which drops
+# the manifest cache, sends every Application to Unknown, and makes Kargo's
+# argocd-update step time out waiting for a sync that cannot finish. Five
+# seconds and five failures is still a real health check; it just does not
+# mistake a loaded laptop for a hung process.
 helm upgrade --install argocd \
     --namespace "$NS" \
     --force-conflicts \
+    --set repoServer.livenessProbe.timeoutSeconds=5 \
+    --set repoServer.livenessProbe.failureThreshold=5 \
+    --set repoServer.readinessProbe.timeoutSeconds=5 \
+    --set repoServer.readinessProbe.failureThreshold=5 \
+    --set server.livenessProbe.timeoutSeconds=5 \
+    --set server.livenessProbe.failureThreshold=5 \
+    --set server.readinessProbe.timeoutSeconds=5 \
+    --set server.readinessProbe.failureThreshold=5 \
+    --set controller.readinessProbe.timeoutSeconds=5 \
+    --set controller.readinessProbe.failureThreshold=5 \
     --create-namespace argo/argo-cd
 
 echo "Waiting for Argo CD deployment to be ready..."
