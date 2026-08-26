@@ -14,7 +14,7 @@ NS=kargo-system
 PROJECT_NS=microservice-delivery
 BASE_DIR="$(dirname "$0")"
 KARGO_VERSION=1.11.2
-ROLLOUTS_VERSION=v1.7.2
+ROLLOUTS_CHART_VERSION=2.41.1
 PORT=3002
 REPO_URL="https://github.com/koorikla/platform-engineering-backstack.git"
 GIT_USERNAME=koorikla
@@ -26,9 +26,18 @@ GIT_USERNAME=koorikla
 # nothing would say why. Only the controller and CRDs are needed -- no Rollout
 # resources are used.
 echo "Installing Argo Rollouts (provides the AnalysisTemplate CRD Kargo verifies with)..."
-kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n argo-rollouts -f \
-    "https://github.com/argoproj/argo-rollouts/releases/download/${ROLLOUTS_VERSION}/install.yaml" >/dev/null
+# Installed from the chart rather than `kubectl apply -f <github release url>`:
+# that fetches over the network with no retry, and a transient GitHub timeout
+# aborts the whole bootstrap. Helm is already a prerequisite here and retries
+# repository access. installCRDs defaults to true, which is the part Kargo needs.
+helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+helm repo update argo >/dev/null
+helm upgrade --install argo-rollouts argo/argo-rollouts \
+    --version "$ROLLOUTS_CHART_VERSION" \
+    --namespace argo-rollouts \
+    --create-namespace \
+    --set installCRDs=true \
+    --wait --timeout 5m
 
 echo "Waiting for the AnalysisTemplate CRD to be established..."
 kubectl wait --for=condition=established --timeout=120s \
