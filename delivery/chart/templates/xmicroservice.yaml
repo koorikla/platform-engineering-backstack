@@ -1,0 +1,25 @@
+{{/*
+The whole chart: one XMicroservice. Crossplane composes the Deployment and the
+Service from it, so there is nothing else to template.
+
+The two `required` calls guard the values chain. Without them a render that
+forgot -f values-cluster.yaml would still merge the chart defaults with the
+environment layer and emit a perfectly valid manifest -- for the wrong zone.
+This turns that into a failed render instead.
+
+Template comments rather than YAML ones on purpose: a `#` line here would be
+copied into the rendered branch verbatim.
+*/}}
+apiVersion: sparky.ee/v1alpha1
+kind: XMicroservice
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    platform.hooli.tech/stage: {{ required "values-cluster.yaml must set .Values.stage" .Values.stage | quote }}
+    topology.kubernetes.io/zone: {{ required "values-cluster.yaml must set .Values.zone" .Values.zone | quote }}
+spec:
+  image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+  replicas: {{ .Values.replicas }}
+  port: {{ .Values.port }}
+  serviceType: {{ .Values.serviceType }}

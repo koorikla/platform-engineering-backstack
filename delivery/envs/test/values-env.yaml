@@ -1,0 +1,6 @@
+# Layer 2 of 3: the test environment.
+#
+# Still one replica per zone, but written out rather than inherited from the
+# chart defaults: test is where a change to environment-wide policy is tried
+# before prod gets it, so the policy needs a file of its own to live in.
+replicas: 1

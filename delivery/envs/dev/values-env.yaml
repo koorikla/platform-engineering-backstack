@@ -1,0 +1,6 @@
+# Layer 2 of 3: the dev environment.
+#
+# Applies to all three dev zones. One replica -- dev exists to catch a broken
+# image quickly, and a second pod would only hide a crash loop behind an
+# endpoint that still answers.
+replicas: 1

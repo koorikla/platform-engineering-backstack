@@ -1,0 +1,20 @@
+# Layer 1 of 3: chart defaults.
+#
+# These hold for every environment and every cluster. Anything that varies
+# belongs one layer down (values-env.yaml) or two (values-cluster.yaml), and a
+# promotion overrides image.tag on top of all three.
+image:
+  repository: ghcr.io/stefanprodan/podinfo
+  # Only a seed, used when .bootstrap/kargo/up.sh first renders a stage branch.
+  # Promotions pass the tag Kargo selected with --set, so this value never
+  # reaches a cluster after the first render and is expected to lag behind.
+  tag: 6.7.0
+
+replicas: 1
+port: 9898
+serviceType: ClusterIP
+
+# No defaults: values-cluster.yaml must name the cluster and the zone it renders
+# for. See the `required` calls in templates/xmicroservice.yaml.
+stage: ""
+zone: ""

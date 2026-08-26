@@ -1,28 +1,92 @@
-# Delivery stages for the Kargo pipeline.
+# Delivery stages for the Kargo pipeline: three environments, each spread over
+# three availability zones. In a real platform each of these is a cluster of its
+# own; here one kind cluster stands in for all nine, and a namespace stands in
+# for each.
+#
+# The name is <environment><region>-<zone index>, so dev1-2 is the third zone of
+# region 1 in dev. Zone 0 of each environment is its canary -- see the Stage
+# definitions in kargo/stages/.
 #
 # Separate from tenants.yaml on purpose: team-a/team-b are tenants, these are
-# environments. They are different axes, and a tenant's queues should not be
-# disturbed by a promotion.
+# environments. Different axes, and a tenant's queues should not be disturbed by
+# a promotion.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: dev1-0
-  labels: { platform.hooli.tech/stage: dev1-0, platform.hooli.tech/stage-class: dev }
+  labels:
+    platform.hooli.tech/stage: dev1-0
+    platform.hooli.tech/environment: dev
+    topology.kubernetes.io/zone: eu-north-1a
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: dev1-1
-  labels: { platform.hooli.tech/stage: dev1-1, platform.hooli.tech/stage-class: dev }
+  labels:
+    platform.hooli.tech/stage: dev1-1
+    platform.hooli.tech/environment: dev
+    topology.kubernetes.io/zone: eu-north-1b
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: tst
-  labels: { platform.hooli.tech/stage: tst, platform.hooli.tech/stage-class: test }
+  name: dev1-2
+  labels:
+    platform.hooli.tech/stage: dev1-2
+    platform.hooli.tech/environment: dev
+    topology.kubernetes.io/zone: eu-north-1c
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: prd
-  labels: { platform.hooli.tech/stage: prd, platform.hooli.tech/stage-class: prod }
+  name: test1-0
+  labels:
+    platform.hooli.tech/stage: test1-0
+    platform.hooli.tech/environment: test
+    topology.kubernetes.io/zone: eu-north-1a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test1-1
+  labels:
+    platform.hooli.tech/stage: test1-1
+    platform.hooli.tech/environment: test
+    topology.kubernetes.io/zone: eu-north-1b
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test1-2
+  labels:
+    platform.hooli.tech/stage: test1-2
+    platform.hooli.tech/environment: test
+    topology.kubernetes.io/zone: eu-north-1c
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod1-0
+  labels:
+    platform.hooli.tech/stage: prod1-0
+    platform.hooli.tech/environment: prod
+    topology.kubernetes.io/zone: eu-north-1a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod1-1
+  labels:
+    platform.hooli.tech/stage: prod1-1
+    platform.hooli.tech/environment: prod
+    topology.kubernetes.io/zone: eu-north-1b
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod1-2
+  labels:
+    platform.hooli.tech/stage: prod1-2
+    platform.hooli.tech/environment: prod
+    topology.kubernetes.io/zone: eu-north-1c

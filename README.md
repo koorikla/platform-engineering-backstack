@@ -241,6 +241,121 @@ This command will:
 - Check if required dependencies are installed.
 - Delete the Kubernetes `platform` cluster if it exists.
 
+### Backstage Dev Loop (optional)
+
+`make up` builds the Backstage image once and then leaves it alone. If you are
+editing Backstage itself — plugins, `app-config.yaml`, the catalog —
+[`skaffold`](https://skaffold.dev/docs/install/) gives you a rebuild-and-redeploy
+loop against the same cluster:
+
+```sh
+make dev-backstage
+```
+
+It watches `backstage/`, rebuilds the image on every change, side-loads it into
+the `platform` kind cluster, rolls the pod, streams the container logs, and holds
+the port-forward on [http://localhost:3000](http://localhost:3000). `Ctrl-C`
+stops the loop and leaves the last build running.
+
+Two things to know before the first run:
+
+- **Commit and push `argocd/apps/backstage/app.yaml` first.** Skaffold deploys
+  the Deployment with a content-addressed image tag, which diffs against the
+  `backstage:latest` recorded in Git. The `ignoreDifferences` rule in that file
+  tells Argo CD to leave that one field alone; without it `selfHeal` reverts
+  every redeploy within seconds. Argo CD reads `Application` objects from Git, so
+  editing the file locally is not enough.
+- **A real sync resets the image.** `backstage-app` syncs with `Replace=true`,
+  so anything you later push under `.bootstrap/backstage/manifests/` replaces the
+  Deployment wholesale and restores `backstage:latest`. Just re-run
+  `make dev-backstage`.
+
+The Skaffold config (`skaffold.yaml`) deliberately covers Backstage only. Cluster
+creation, the `argocd` CLI bootstrap, secret templating from `.env`, and the
+Crossplane/Kyverno readiness polling have no Skaffold equivalent and stay in
+`make up` and `.bootstrap/*/up.sh`.
+
+### Progressive Delivery (Kargo)
+
+Kargo watches the [podinfo](https://github.com/stefanprodan/podinfo) image and
+walks each new tag through nine zones — three environments spread over three
+availability zones each, one namespace standing in for each cluster:
+
+```
+warehouse (new podinfo tag)
+    │
+    ▼
+  dev1-0  canary ──┬──► dev1-1
+                   └──► dev1-2
+    ⋮  all three dev zones verified
+    ▼
+  test1-0 canary ──┬──► test1-1
+                   └──► test1-2
+    ⋮  all three test zones verified
+    ▼
+  prod1-0 canary ──┬──► prod1-1
+                   └──► prod1-2
+```
+
+Zone 0 of each environment is its canary: Freight lands there first and the two
+sibling zones promote in parallel only after it verifies. The next environment
+opens only once **all three** zones of the previous one have verified — that is
+`sources.availabilityStrategy: All` on the canary Stage; Kargo's default would
+let a single verified zone open the gate.
+
+Verification is a real check, not a formality: after each promotion an Argo
+Rollouts `AnalysisTemplate` curls podinfo's `/healthz` through the Service that
+Crossplane composed, three times, in the zone that was just promoted. A failure
+stops the rollout there instead of reporting it afterwards.
+
+#### Rendered manifests, not templated ones
+
+A promotion does not edit a manifest in `main`. It renders one and commits the
+result to that zone's own branch:
+
+| Branch                 | Holds                                                        |
+| ---------------------- | ------------------------------------------------------------ |
+| `main`                 | The Helm chart and the values chain — the *source*.           |
+| `stage/<zone>` (×9)    | `manifests.yaml`, fully rendered — the *desired state*.       |
+
+Each Argo CD `Application` tracks `stage/<zone>` rather than a path in `main`,
+so nothing re-renders at sync time and `git show stage/prod1-0:manifests.yaml`
+is an honest answer to "what is running in that zone?". The promotion steps are
+in `kargo/stages/<zone>.yaml`: clone `main` and the stage branch, `git-clear`
+the branch, `helm-template` into it, commit, push, then wait for Argo CD to
+report the zone healthy before the analysis starts.
+
+#### The values chain
+
+`delivery/` holds the source, and values are layered narrowest-last:
+
+```
+delivery/
+├── chart/                            # 1. chart defaults — values.yaml
+└── envs/
+    ├── dev/
+    │   ├── values-env.yaml           # 2. environment policy (replicas: 1)
+    │   ├── dev1-0/values-cluster.yaml  # 3. this zone only (identity, overrides)
+    │   ├── dev1-1/values-cluster.yaml
+    │   └── dev1-2/values-cluster.yaml
+    ├── test/…
+    └── prod/                         #    values-env.yaml sets replicas: 2
+```
+
+The promoted image tag appears in none of them — it comes from Kargo through
+`setValues` at render time, so no file in `main` can claim a version that is not
+actually deployed. Render any zone exactly the way the pipeline does with:
+
+```sh
+helm template podinfo ./delivery/chart --namespace prod1-0 \
+  -f ./delivery/envs/prod/values-env.yaml \
+  -f ./delivery/envs/prod/prod1-0/values-cluster.yaml
+```
+
+The nine `stage/*` branches are seeded by `.bootstrap/kargo/up.sh` on first run,
+which needs `GITHUB_TOKEN` in `.env` to have write access to your fork.
+Branches that already exist are left alone.
+
 ### Troubleshooting
 
 If you encounter issues, ensure that:

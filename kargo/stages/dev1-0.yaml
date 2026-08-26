@@ -1,9 +1,13 @@
-# Stage dev1-0. Accepts straight from the Warehouse -- this is the pipeline's entry point.
+# Stage dev1-0. The canary zone of the whole pipeline. It takes Freight straight from
+# the Warehouse, so every new podinfo tag lands here first.
 #
-# A promotion is a Git commit, not a cluster write: the steps below clone the
-# repo, rewrite spec.image in this stage's XMicroservice, and push. Argo CD then
-# syncs it, so the cluster state still comes from Git and the promotion is
-# auditable in history.
+# The promotion renders manifests rather than editing them in place: it checks
+# main out as the source and the stage/dev1-0 branch as the output, wipes the
+# output, and renders the chart through this zone's values chain into the
+# branch. main never changes, and the branch holds the entire desired state of
+# dev1-0 -- no values left to merge, no tag left to substitute, which is what
+# makes `git show stage/dev1-0:manifests.yaml` an honest answer to "what is
+# running there?".
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
@@ -20,32 +24,69 @@ spec:
   promotionTemplate:
     spec:
       steps:
+        # ./src is the source of truth; ./out is this zone's rendered branch.
+        # create: true lets the first promotion start the branch as an orphan
+        # if .bootstrap/kargo/up.sh has not seeded it.
         - uses: git-clone
           config:
             repoURL: https://github.com/koorikla/platform-engineering-backstack.git
             checkout:
               - branch: main
-                path: ./repo
+                path: ./src
+              - branch: stage/dev1-0
+                create: true
+                path: ./out
 
-        - uses: yaml-update
+        # The branch is output only, so it is rebuilt from empty every time.
+        # Without this a resource dropped from the chart would linger in the
+        # branch and Argo CD would happily keep applying it.
+        - uses: git-clear
           config:
-            path: ./repo/crossplane/xrs/stages/dev1-0/podinfo.yaml
-            updates:
-              - key: spec.image
-                value: ${{ imageFrom("ghcr.io/stefanprodan/podinfo").RepoURL }}:${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}
+            path: ./out
+
+        # The three values layers, narrowest last. The promoted tag arrives
+        # through setValues rather than being written into a values file: it is
+        # the one input that changes on every promotion, and the rendered branch
+        # already records which tag was used.
+        - uses: helm-template
+          config:
+            path: ./src/delivery/chart
+            releaseName: podinfo
+            namespace: dev1-0
+            valuesFiles:
+              - ./src/delivery/envs/dev/values-env.yaml
+              - ./src/delivery/envs/dev/dev1-0/values-cluster.yaml
+            setValues:
+              - key: image.tag
+                value: ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}
+            outPath: ./out/manifests.yaml
 
         - uses: git-commit
+          as: commit
           config:
-            path: ./repo
-            message: 'chore(dev1-0): promote podinfo ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}'
+            path: ./out
+            message: 'chore(dev1-0): render podinfo ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}'
 
         - uses: git-push
           config:
-            path: ./repo
+            path: ./out
+
+        # Waits for Argo CD to sync the commit just pushed and report the zone
+        # healthy. Without it the verification below would run against whatever
+        # the previous sync left behind -- Argo CD polls Git every three
+        # minutes, so a quick analysis could pass on the old image.
+        - uses: argocd-update
+          config:
+            apps:
+              - name: podinfo-dev1-0
+                namespace: argocd-system
+                sources:
+                  - repoURL: git@github.com:koorikla/platform-engineering-backstack.git
+                    desiredRevision: ${{ outputs.commit.commit }}
 
   # The quality gate. Runs after the promotion lands and decides whether this
-  # Freight becomes eligible for the next stage -- a failure here stops the
-  # rollout rather than merely reporting it.
+  # Freight becomes eligible downstream -- a failure here stops the rollout in
+  # this zone rather than merely reporting it.
   verification:
     analysisTemplates:
       - name: podinfo-healthy

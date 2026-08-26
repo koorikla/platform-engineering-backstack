@@ -1,0 +1,6 @@
+# Layer 2 of 3: the prod environment.
+#
+# Two replicas in every zone, so a rolling update never drops a zone to zero
+# serving pods. This is the layer that carries environment policy: it reaches
+# every prod zone, including ones added later, without being repeated per zone.
+replicas: 2

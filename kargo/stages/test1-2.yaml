@@ -1,17 +1,17 @@
-# Stage dev1-1. One of the two dev zones that fan out from dev1-0. It promotes in
+# Stage test1-2. One of the two test zones that fan out from test1-0. It promotes in
 # parallel with its sibling once the canary zone has verified.
 #
 # The promotion renders manifests rather than editing them in place: it checks
-# main out as the source and the stage/dev1-1 branch as the output, wipes the
+# main out as the source and the stage/test1-2 branch as the output, wipes the
 # output, and renders the chart through this zone's values chain into the
 # branch. main never changes, and the branch holds the entire desired state of
-# dev1-1 -- no values left to merge, no tag left to substitute, which is what
-# makes `git show stage/dev1-1:manifests.yaml` an honest answer to "what is
+# test1-2 -- no values left to merge, no tag left to substitute, which is what
+# makes `git show stage/test1-2:manifests.yaml` an honest answer to "what is
 # running there?".
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
-  name: dev1-1
+  name: test1-2
   namespace: microservice-delivery
 spec:
   requestedFreight:
@@ -20,7 +20,7 @@ spec:
         name: podinfo
       sources:
         stages:
-          - dev1-0
+          - test1-0
 
   promotionTemplate:
     spec:
@@ -34,7 +34,7 @@ spec:
             checkout:
               - branch: main
                 path: ./src
-              - branch: stage/dev1-1
+              - branch: stage/test1-2
                 create: true
                 path: ./out
 
@@ -53,10 +53,10 @@ spec:
           config:
             path: ./src/delivery/chart
             releaseName: podinfo
-            namespace: dev1-1
+            namespace: test1-2
             valuesFiles:
-              - ./src/delivery/envs/dev/values-env.yaml
-              - ./src/delivery/envs/dev/dev1-1/values-cluster.yaml
+              - ./src/delivery/envs/test/values-env.yaml
+              - ./src/delivery/envs/test/test1-2/values-cluster.yaml
             setValues:
               - key: image.tag
                 value: ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}
@@ -66,7 +66,7 @@ spec:
           as: commit
           config:
             path: ./out
-            message: 'chore(dev1-1): render podinfo ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}'
+            message: 'chore(test1-2): render podinfo ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}'
 
         - uses: git-push
           config:
@@ -79,7 +79,7 @@ spec:
         - uses: argocd-update
           config:
             apps:
-              - name: podinfo-dev1-1
+              - name: podinfo-test1-2
                 namespace: argocd-system
                 sources:
                   - repoURL: git@github.com:koorikla/platform-engineering-backstack.git
@@ -93,4 +93,4 @@ spec:
       - name: podinfo-healthy
     args:
       - name: stage-namespace
-        value: dev1-1
+        value: test1-2

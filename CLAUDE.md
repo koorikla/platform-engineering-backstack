@@ -46,13 +46,22 @@ This is a **Platform Engineering BACK Stack** - a local development environment 
 │   ├── namespaces/     # Tenant namespaces the XRs land in
 │   ├── providers/      # Crossplane provider installations
 │   └── providers-config/ # Provider authentication configs
+├── kargo/              # Progressive delivery pipeline
+│   ├── project.yaml    # Kargo Project (owns the microservice-delivery namespace)
+│   ├── warehouse.yaml  # Watches the podinfo image, turns tags into Freight
+│   ├── stages/         # One Stage per zone (dev1-0..2, test1-0..2, prod1-0..2)
+│   └── analysis-templates/ # The /healthz gate each promotion must pass
+├── delivery/           # Source the pipeline renders (NOT applied from main)
+│   ├── chart/          # Helm chart: one XMicroservice
+│   └── envs/           # values-env.yaml per env, values-cluster.yaml per zone
 ├── kyverno/            # ClusterPolicy definitions
 ├── backstage/          # Backstage monorepo
 │   ├── packages/       # app/ and backend/
 │   ├── catalog/        # Service catalog and templates
 │   ├── app-config.yaml # Main Backstage configuration
 │   └── Makefile        # Helper commands
-└── api-server/         # Example Go app for creating Crossplane XRs
+├── api-server/         # Example Go app for creating Crossplane XRs
+└── skaffold.yaml       # Backstage-only dev loop (build -> kind load -> redeploy)
 
 ```
 
@@ -125,6 +134,27 @@ argocd app list                    # List all applications
 argocd app get <app-name>          # Get app details
 argocd app sync <app-name>         # Manually sync app
 argocd app diff <app-name>         # Show differences
+```
+
+### Working with Kargo
+
+```bash
+# The pipeline: nine Stages across three environments
+kubectl get stages -n microservice-delivery
+kubectl get freight -n microservice-delivery
+kubectl get promotions -n microservice-delivery
+
+# What a zone actually runs -- the rendered branch is the desired state
+git fetch origin 'refs/heads/stage/*:refs/remotes/origin/stage/*'
+git show origin/stage/prod1-0:manifests.yaml
+
+# Render a zone the way the pipeline does (chart defaults < env < cluster)
+helm template podinfo ./delivery/chart --namespace prod1-0 \
+  -f ./delivery/envs/prod/values-env.yaml \
+  -f ./delivery/envs/prod/prod1-0/values-cluster.yaml
+
+# Promote by hand
+kargo promote --project microservice-delivery --stage dev1-0 --freight <id>
 ```
 
 ### Working with Kyverno
@@ -206,6 +236,27 @@ matter when editing anything under `/crossplane`:
 - Compositions use `function-go-templating` to render composed resources, plus
   `function-auto-ready` to propagate readiness from the Queue up to the XQueue.
 
+### Rendered Manifests
+
+Kargo promotions do not edit manifests in `main`; they render them. Two rules
+follow from that and are easy to break by accident:
+
+- **`delivery/` is source, never applied.** No Argo CD Application points at it.
+  Editing a values file changes what the *next* promotion renders — it does not
+  change a running zone until Freight is promoted through it.
+- **`stage/<zone>` branches are output, never edited by hand.** Every promotion
+  runs `git-clear` and rewrites the branch from empty, so a hand-edit survives
+  exactly until the next promotion. The branches are seeded by
+  `.bootstrap/kargo/up.sh`, which skips any that already exist.
+
+The image tag deliberately appears in no values file: Kargo passes it through
+`setValues` at render time. Adding `image.tag` to a values file would create a
+second place claiming to know which version runs where.
+
+Stage XRs used to live in `crossplane/xrs/stages/`. They do not any more — that
+path was synced from `main`, which is exactly what the rendered branches
+replace.
+
 ### Provider Configuration
 
 - Crossplane providers use LocalStack by default (`default` ClusterProviderConfig, group `aws.m.upbound.io`)
@@ -231,6 +282,8 @@ Ensure both are kept in sync. If you modify XRD schemas, update corresponding Ky
 - Kyverno: `kyverno-system`
 - LocalStack: `localstack-system`
 - Tenant XRs: deployed in the namespace specified in the XR YAML (`team-a`, `team-b`)
+- Delivery zones: `dev1-0`..`dev1-2`, `test1-0`..`test1-2`, `prod1-0`..`prod1-2`
+  (`<env><region>-<zone>`; one namespace stands in for one cluster)
 
 ## Testing
 

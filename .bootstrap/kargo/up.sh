@@ -70,6 +70,16 @@ kubectl wait --for=condition=established --timeout=120s \
     exit 1
 }
 
+# ADMIN_PASSWORD_HASH is the bcrypt hash of the password the README documents
+# (admin/admin). Regenerate with:
+#
+#   htpasswd -bnBC 10 "" <password> | tr -d ':\n'
+#
+# It must stay single-quoted: the $-delimited bcrypt fields would otherwise be
+# expanded as shell variables and silently collapse to an empty string. (helm
+# --set treats dots inside a *value* literally, so the hash itself is safe.)
+ADMIN_PASSWORD_HASH='$2y$10$83KrWdh8YgvE5EldhjC7ve62mMzTAuwInevN4pIcuBHfdXY8AaaKi'
+
 echo "Installing or upgrading Kargo..."
 helm upgrade --install kargo \
     oci://ghcr.io/akuity/kargo-charts/kargo \
@@ -77,7 +87,7 @@ helm upgrade --install kargo \
     --namespace "$NS" \
     --create-namespace \
     --set api.service.type=ClusterIP \
-    --set api.adminAccount.passwordHash='$2a$10$Zrhhie4vLz5ygtVSaif6o.qN36jgs6vjtHbdWoYjX4uMe3Q8hnfsy' \
+    --set api.adminAccount.passwordHash="$ADMIN_PASSWORD_HASH" \
     --set api.adminAccount.tokenSigningKey=kargo-local-dev-signing-key \
     --set api.rollouts.integrationEnabled=true \
     --wait --timeout 5m
@@ -119,6 +129,55 @@ sed -e "s|<repo-url-placeholder>|$(b64 "$REPO_URL")|" \
     -e "s|<placeholder>|$(b64 "$GITHUB_TOKEN")|" \
     "$BASE_DIR/manifests/git-credentials.template.yaml" |
     kubectl apply -f -
+
+# The stage branches carry rendered manifests and nothing else: Argo CD tracks
+# stage/<zone>, and each promotion replaces the branch's whole contents with the
+# chart rendered through that zone's values chain.
+#
+# Kargo creates a missing branch on its first promotion, but until Freight has
+# walked all nine zones that leaves most of the Applications pointing at a
+# revision that does not exist. Seeding renders the same chain from the tag in
+# delivery/chart/values.yaml, so the stack comes up consistent. Branches that
+# already exist are left to Kargo -- this never overwrites a promotion.
+echo "Seeding the rendered stage branches..."
+AUTH_REPO_URL="https://${GIT_USERNAME}:${GITHUB_TOKEN}@${REPO_URL#https://}"
+for STAGE in dev1-0 dev1-1 dev1-2 test1-0 test1-1 test1-2 prod1-0 prod1-1 prod1-2; do
+    # dev1-2 -> dev, test1-0 -> test: the environment is the name up to the region digit.
+    ENV="${STAGE%%[0-9]*}"
+    BRANCH="stage/$STAGE"
+
+    if git ls-remote --exit-code --heads "$AUTH_REPO_URL" "$BRANCH" >/dev/null 2>&1; then
+        echo "  $BRANCH already exists, leaving it to Kargo."
+        continue
+    fi
+
+    echo "  creating $BRANCH"
+    SEED_DIR="$(mktemp -d)"
+    # The same three layers, in the same order, that the promotion template uses.
+    helm template podinfo ./delivery/chart \
+        --namespace "$STAGE" \
+        --values "./delivery/envs/$ENV/values-env.yaml" \
+        --values "./delivery/envs/$ENV/$STAGE/values-cluster.yaml" \
+        >"$SEED_DIR/manifests.yaml"
+    git -C "$SEED_DIR" init -q -b "$BRANCH"
+    git -C "$SEED_DIR" add manifests.yaml
+    git -C "$SEED_DIR" \
+        -c user.name="platform-bootstrap" \
+        -c user.email="platform-bootstrap@localhost" \
+        commit -q -m "chore($STAGE): seed rendered manifests"
+    # stderr dropped because git echoes the remote it pushed to, token included.
+    if ! git -C "$SEED_DIR" push --quiet "$AUTH_REPO_URL" "HEAD:refs/heads/$BRANCH" 2>/dev/null; then
+        rm -rf "$SEED_DIR"
+        echo "❌ could not push $BRANCH -- does GITHUB_TOKEN have write access to $REPO_URL?"
+        exit 1
+    fi
+    rm -rf "$SEED_DIR"
+done
+
+# Applied here rather than through the app-of-apps so it lands after the
+# branches above exist.
+echo "Applying the stage Applications..."
+kubectl apply -f ./argocd/stages.yaml
 
 echo "Applying the analysis template, warehouse and stages..."
 kubectl apply -f ./kargo/analysis-templates

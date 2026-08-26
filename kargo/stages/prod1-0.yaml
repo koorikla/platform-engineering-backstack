@@ -1,17 +1,17 @@
-# Stage dev1-1. One of the two dev zones that fan out from dev1-0. It promotes in
-# parallel with its sibling once the canary zone has verified.
+# Stage prod1-0. The canary zone of the prod environment. It accepts only Freight that has
+# verified in all three test zones.
 #
 # The promotion renders manifests rather than editing them in place: it checks
-# main out as the source and the stage/dev1-1 branch as the output, wipes the
+# main out as the source and the stage/prod1-0 branch as the output, wipes the
 # output, and renders the chart through this zone's values chain into the
 # branch. main never changes, and the branch holds the entire desired state of
-# dev1-1 -- no values left to merge, no tag left to substitute, which is what
-# makes `git show stage/dev1-1:manifests.yaml` an honest answer to "what is
+# prod1-0 -- no values left to merge, no tag left to substitute, which is what
+# makes `git show stage/prod1-0:manifests.yaml` an honest answer to "what is
 # running there?".
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
-  name: dev1-1
+  name: prod1-0
   namespace: microservice-delivery
 spec:
   requestedFreight:
@@ -20,7 +20,13 @@ spec:
         name: podinfo
       sources:
         stages:
-          - dev1-0
+          - test1-0
+          - test1-1
+          - test1-2
+        # Every zone of the previous environment, not just one: with the
+        # default OneOf strategy a single verified zone would open the gate
+        # to the next environment while its siblings were still rolling.
+        availabilityStrategy: All
 
   promotionTemplate:
     spec:
@@ -34,7 +40,7 @@ spec:
             checkout:
               - branch: main
                 path: ./src
-              - branch: stage/dev1-1
+              - branch: stage/prod1-0
                 create: true
                 path: ./out
 
@@ -53,10 +59,10 @@ spec:
           config:
             path: ./src/delivery/chart
             releaseName: podinfo
-            namespace: dev1-1
+            namespace: prod1-0
             valuesFiles:
-              - ./src/delivery/envs/dev/values-env.yaml
-              - ./src/delivery/envs/dev/dev1-1/values-cluster.yaml
+              - ./src/delivery/envs/prod/values-env.yaml
+              - ./src/delivery/envs/prod/prod1-0/values-cluster.yaml
             setValues:
               - key: image.tag
                 value: ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}
@@ -66,7 +72,7 @@ spec:
           as: commit
           config:
             path: ./out
-            message: 'chore(dev1-1): render podinfo ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}'
+            message: 'chore(prod1-0): render podinfo ${{ imageFrom("ghcr.io/stefanprodan/podinfo").Tag }}'
 
         - uses: git-push
           config:
@@ -79,7 +85,7 @@ spec:
         - uses: argocd-update
           config:
             apps:
-              - name: podinfo-dev1-1
+              - name: podinfo-prod1-0
                 namespace: argocd-system
                 sources:
                   - repoURL: git@github.com:koorikla/platform-engineering-backstack.git
@@ -93,4 +99,4 @@ spec:
       - name: podinfo-healthy
     args:
       - name: stage-namespace
-        value: dev1-1
+        value: prod1-0

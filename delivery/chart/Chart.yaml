@@ -1,0 +1,10 @@
+# The chart the delivery pipeline renders. It is deliberately tiny: one
+# XMicroservice XR. The platform API is the abstraction, so the chart has no
+# business templating Deployments or Services -- Crossplane composes those from
+# the XR once Argo CD applies it.
+apiVersion: v2
+name: microservice
+description: The XMicroservice the Kargo pipeline promotes through the stages.
+type: application
+version: 0.1.0
+appVersion: "6.7.0"

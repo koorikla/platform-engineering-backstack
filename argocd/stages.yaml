@@ -1,0 +1,51 @@
+# The Argo CD half of the Kargo pipeline.
+#
+# One Application per zone, each tracking that zone's rendered branch rather
+# than a path in main. The branch holds fully rendered manifests -- no chart, no
+# values chain, no image placeholder -- so what Argo CD applies is exactly what
+# the promotion produced, and nothing re-renders at sync time.
+#
+# Applied by .bootstrap/kargo/up.sh rather than by the app-of-apps, because that
+# script seeds the branches these Applications track: creating the Applications
+# first would leave nine of them erroring on a revision that does not exist yet.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: microservice-stages
+  namespace: argocd-system
+spec:
+  generators:
+    - list:
+        elements:
+          - stage: dev1-0
+          - stage: dev1-1
+          - stage: dev1-2
+          - stage: test1-0
+          - stage: test1-1
+          - stage: test1-2
+          - stage: prod1-0
+          - stage: prod1-1
+          - stage: prod1-2
+
+  template:
+    metadata:
+      name: podinfo-{{stage}}
+      annotations:
+        # Without this Kargo refuses the argocd-update step in the promotion
+        # template: an Application has to opt in to being driven by a Stage, and
+        # it names the Stage as <project>:<stage>.
+        kargo.akuity.io/authorized-stage: microservice-delivery:{{stage}}
+    spec:
+      project: default
+      source:
+        repoURL: git@github.com:koorikla/platform-engineering-backstack.git
+        # The rendered branch, not HEAD. Kargo pushes here; nothing else does.
+        targetRevision: stage/{{stage}}
+        path: .
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{stage}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

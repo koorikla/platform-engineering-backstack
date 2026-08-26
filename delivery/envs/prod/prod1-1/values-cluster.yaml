@@ -1,0 +1,14 @@
+# Layer 3 of 3: cluster prod1-1 (prod environment, zone eu-north-1b).
+#
+# prod1-1 is one of the two zones that fan out from prod1-0.
+#
+# The narrowest layer: it wins over the chart defaults and over
+# ../values-env.yaml, and exists so one zone can deviate without disturbing its
+# siblings. Today it declares identity only -- both values become labels on the
+# rendered XR -- and a real deviation (a zone running more replicas while it
+# absorbs traffic from a drained neighbour) would be one more line here.
+#
+# The image tag is deliberately absent from all three layers: the promotion
+# supplies it, so no file in main can drift from what is actually deployed.
+stage: prod1-1
+zone: eu-north-1b

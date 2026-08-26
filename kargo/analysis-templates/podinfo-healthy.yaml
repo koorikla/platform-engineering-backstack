@@ -29,8 +29,10 @@ spec:
       interval: 15s
       # No retries: any failed probe fails the analysis and blocks promotion.
       failureLimit: 0
-      # Give Argo CD and Crossplane time to reconcile before the first probe.
-      initialDelay: 30s
+      # A short settling delay only. The promotion's argocd-update step has
+      # already waited for Argo CD to sync the rendered branch and report the
+      # stage healthy, so there is nothing left to poll for here.
+      initialDelay: 10s
       provider:
         job:
           spec:
