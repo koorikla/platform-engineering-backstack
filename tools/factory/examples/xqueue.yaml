@@ -1,0 +1,85 @@
+# The existing hand-written XQueue, expressed as a factory spec.
+#
+# This one is kept as a fidelity check: generating it with --dry-run should
+# reproduce crossplane/xrds/xqueue.yaml, crossplane/compositions/aws/xqueue.yaml
+# and kyverno/validate-xqueue-fields.yaml modulo comments and key order. If a
+# change to the factory breaks that, the factory has drifted from the idioms the
+# stack actually uses.
+kind: XQueue
+group: platform.hooli.tech
+version: v1alpha1
+provider: aws
+description: >-
+  An SQS queue, provisioned against LocalStack through the namespaced
+  provider-aws-sqs family.
+
+fields:
+  - name: location
+    type: string
+    description: Which region family the queue is created in.
+    required: true
+    # enum, not `oneOf: [{pattern: ^EU$}, ...]` -- each oneOf branch would carry
+    # no type, and the scaffolder form kubernetes-ingestor generates from this
+    # schema then fails with "Unknown field type undefined" instead of rendering
+    # a dropdown.
+    enum:
+      - EU
+      - US
+  - name: providerName
+    type: string
+    description: Name of the ClusterProviderConfig the Queue authenticates with.
+    required: true
+    example: default
+  - name: visibilityTimeoutSeconds
+    type: integer
+    description: How long a received message stays invisible to other consumers.
+    minimum: 0
+    maximum: 43200
+    example: 30
+  - name: maxMessageSize
+    type: integer
+    description: Largest message the queue accepts, in bytes.
+    minimum: 1024
+    maximum: 262144
+    example: 262144
+  - name: tags
+    type: object
+    description: Tags copied onto the SQS queue.
+    additionalProperties: string
+
+printerColumns:
+  - name: LOCATION
+    jsonPath: .spec.location
+
+resources:
+  # A namespaced XR can only compose namespaced managed resources, so this is
+  # sqs.aws.m.upbound.io and not sqs.aws.upbound.io. Crossplane creates the
+  # Queue in the XR's own namespace.
+  - name: main-queue
+    apiVersion: sqs.aws.m.upbound.io/v1beta1
+    kind: Queue
+    # The Queue's own name is left to Crossplane, matching the hand-written
+    # composition.
+    metadataName: false
+    ready: provider
+    providerConfigRef:
+      kind: ClusterProviderConfig
+      fromField: providerName
+    spec:
+      forProvider:
+        region:
+          map:
+            field: location
+            values:
+              EU: eu-north-1
+              US: us-east-2
+        visibilityTimeoutSeconds:
+          fromField: visibilityTimeoutSeconds
+        maxMessageSize:
+          fromField: maxMessageSize
+        tags:
+          fromField: tags
+
+example:
+  name: xqueue-example
+  namespace: team-a

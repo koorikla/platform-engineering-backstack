@@ -1,0 +1,107 @@
+# The existing hand-written XMicroservice, expressed as a factory spec.
+#
+# Two things this example exercises that the XQueue spec does not: a composition
+# that renders more than one resource, and the two readiness modes. Crossplane
+# v2 composes native Kubernetes resources directly -- no provider-kubernetes and
+# no Object wrapper -- so a Deployment and a Service are composed as themselves.
+kind: XMicroservice
+group: sparky.ee
+version: v1alpha1
+provider: kubernetes
+description: >-
+  A container image run as a Deployment and exposed through a Service in the
+  team's own namespace.
+
+fields:
+  - name: image
+    type: string
+    description: Container image to run, including tag.
+    required: true
+    example: ghcr.io/nginxinc/nginx-unprivileged:1.27-alpine
+  - name: replicas
+    type: integer
+    description: Number of pod replicas.
+    minimum: 1
+    default: 1
+  - name: port
+    type: integer
+    description: Port the container listens on; the Service exposes the same port.
+    minimum: 1
+    maximum: 65535
+    default: 8080
+  - name: serviceType
+    type: string
+    description: Kubernetes Service type.
+    enum:
+      - ClusterIP
+      - NodePort
+    default: ClusterIP
+
+printerColumns:
+  - name: IMAGE
+    jsonPath: .spec.image
+  - name: REPLICAS
+    jsonPath: .spec.replicas
+
+resources:
+  - name: deployment
+    apiVersion: apps/v1
+    kind: Deployment
+    # A Deployment reports Available, not the Ready condition function-auto-ready
+    # looks for, so it would never count as ready and the XR would sit at
+    # Creating forever. `ready: replicas` derives readiness from the observed
+    # availableReplicas instead of asserting ready unconditionally.
+    ready: replicas
+    replicasField: replicas
+    labels:
+      app.kubernetes.io/name:
+        fromXR: name
+      app.kubernetes.io/managed-by: crossplane
+    spec:
+      replicas:
+        fromField: replicas
+      selector:
+        matchLabels:
+          app.kubernetes.io/name:
+            fromXR: name
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name:
+              fromXR: name
+        spec:
+          containers:
+            - name: app
+              image:
+                fromField: image
+              ports:
+                - name: http
+                  containerPort:
+                    fromField: port
+
+  - name: service
+    apiVersion: v1
+    kind: Service
+    # A Service is functional the moment it exists -- there is no further
+    # condition to wait on.
+    ready: always
+    labels:
+      app.kubernetes.io/name:
+        fromXR: name
+      app.kubernetes.io/managed-by: crossplane
+    spec:
+      type:
+        fromField: serviceType
+      selector:
+        app.kubernetes.io/name:
+          fromXR: name
+      ports:
+        - name: http
+          port:
+            fromField: port
+          targetPort: http
+          protocol: TCP
+
+example:
+  name: xmicroservice-example
+  namespace: team-a

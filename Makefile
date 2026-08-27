@@ -1,5 +1,5 @@
 
-.PHONY: up down check_bins setup-local-config dev-backstage
+.PHONY: up down check_bins setup-local-config dev-backstage new-api factory-test
 
 check_bins:
 	@command -v kind >/dev/null 2>&1 || { echo >&2 "kind not found! Please install it before continuing."; exit 1; }
@@ -80,3 +80,14 @@ setup-local-config: check_bins
 	FILE="backstage/app-config.local.yaml"; \
 	yq -i '.kubernetes.clusterLocatorMethods[0].clusters[0].serviceAccountToken = strenv(SERVICE_ACCOUNT_TOKEN)' $$FILE; \
 	yq -i '.kubernetes.clusterLocatorMethods[0].clusters[0].url = strenv(CLUSTER_URL)' $$FILE
+
+# Generate a platform API -- XRD, Composition, Kyverno policy + RBAC and an
+# example XR -- from a spec under tools/factory/examples. See
+# tools/factory/README.md. Deliberately not a dependency of `up`: generated
+# manifests are reviewed and committed like any other change.
+new-api:
+	@test -n "$(SPEC)" || { echo >&2 "usage: make new-api SPEC=tools/factory/examples/xbucket.yaml [ARGS=\"--dry-run\"]"; exit 1; }
+	@python3 tools/factory/crossplane_factory.py generate $(SPEC) $(ARGS)
+
+factory-test:
+	@python3 tools/factory/test_factory.py

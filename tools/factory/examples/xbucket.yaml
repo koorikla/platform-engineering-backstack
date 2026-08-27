@@ -1,0 +1,100 @@
+# A platform API that does *not* exist in the repo yet -- the case the factory
+# is actually for.
+#
+# Generating this writes an XRD, a Composition, a Kyverno policy + RBAC pair and
+# an example XR. It is deliberately left ungenerated: crossplane/xrds and
+# crossplane/compositions are synced by the crossplane-system ApplicationSet, so
+# committing the output would install an XRD whose composed kind needs
+# provider-aws-s3 -- add that under crossplane/providers first.
+#
+#   python3 tools/factory/crossplane_factory.py generate tools/factory/examples/xbucket.yaml --dry-run
+kind: XBucket
+group: platform.hooli.tech
+version: v1alpha1
+provider: aws
+description: >-
+  An S3 bucket with versioning and a retention window, provisioned against
+  LocalStack through the namespaced provider-aws-s3 family.
+
+fields:
+  - name: location
+    type: string
+    description: Which region family the bucket is created in.
+    required: true
+    enum:
+      - EU
+      - US
+  - name: providerName
+    type: string
+    description: Name of the ClusterProviderConfig the Bucket authenticates with.
+    required: true
+    example: default
+  - name: versioning
+    type: boolean
+    description: Keep previous versions of overwritten objects.
+    default: false
+  - name: retentionDays
+    type: integer
+    description: Days before a noncurrent version is expired. Omit to keep versions forever.
+    minimum: 1
+    maximum: 3650
+  - name: tags
+    type: object
+    description: Tags copied onto the bucket.
+    additionalProperties: string
+
+printerColumns:
+  - name: LOCATION
+    jsonPath: .spec.location
+  - name: VERSIONING
+    jsonPath: .spec.versioning
+
+resources:
+  # Namespaced managed resource (s3.aws.m.upbound.io, not s3.aws.upbound.io) --
+  # a namespaced XR cannot compose a cluster-scoped one.
+  - name: bucket
+    apiVersion: s3.aws.m.upbound.io/v1beta1
+    kind: Bucket
+    ready: provider
+    providerConfigRef:
+      kind: ClusterProviderConfig
+      fromField: providerName
+    spec:
+      forProvider:
+        region:
+          map:
+            field: location
+            values:
+              EU: eu-north-1
+              US: us-east-2
+        tags:
+          fromField: tags
+
+  # A second managed resource in the same composition: the bucket's versioning
+  # configuration, tied back to the bucket by name.
+  - name: bucket-versioning
+    apiVersion: s3.aws.m.upbound.io/v1beta1
+    kind: BucketVersioning
+    ready: provider
+    providerConfigRef:
+      kind: ClusterProviderConfig
+      fromField: providerName
+    spec:
+      forProvider:
+        region:
+          map:
+            field: location
+            values:
+              EU: eu-north-1
+              US: us-east-2
+        bucket:
+          fromXR: name
+        versioningConfiguration:
+          - status:
+              # `template:` is the escape hatch for anything the mapping forms
+              # do not cover -- here, a boolean rendered as S3's Enabled/Suspended.
+              template: ternary "Enabled" "Suspended" ($spec.versioning | default false)
+
+example:
+  name: xbucket-example
+  namespace: team-a

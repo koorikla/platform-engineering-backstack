@@ -61,6 +61,11 @@ This is a **Platform Engineering BACK Stack** - a local development environment 
 │   ├── app-config.yaml # Main Backstage configuration
 │   └── Makefile        # Helper commands
 ├── api-server/         # Example Go app for creating Crossplane XRs
+├── tools/
+│   └── factory/        # XRD + Composition generator (see its README)
+│       ├── crossplane_factory.py
+│       ├── test_factory.py
+│       └── examples/   # One spec per platform API
 └── skaffold.yaml       # Backstage-only dev loop (build -> kind load -> redeploy)
 
 ```
@@ -184,11 +189,34 @@ kubectl describe clusterpolicy validate-xqueue-fields
 
 ### Creating a New Crossplane XRD
 
+**Via the factory** (recommended): describe the API once and generate the XRD,
+the go-templating Composition, the Kyverno policy + RBAC pair and an example XR.
+See `tools/factory/README.md` for the spec format.
+
+```bash
+python3 tools/factory/crossplane_factory.py new XBucket --group platform.hooli.tech > tools/factory/examples/xbucket.yaml
+# edit the spec, then:
+python3 tools/factory/crossplane_factory.py validate tools/factory/examples/xbucket.yaml
+make new-api SPEC=tools/factory/examples/xbucket.yaml ARGS="--dry-run"
+make new-api SPEC=tools/factory/examples/xbucket.yaml
+make factory-test   # only if you changed the factory itself
+```
+
+**Manually**:
+
 1. Define XRD in `/crossplane/xrds/<name>.yaml`
 2. Create Composition in `/crossplane/compositions/<provider>/<name>.yaml`
-3. Create Backstage template in `/backstage/catalog/templates/<name>/template.yaml`
-4. Add Kyverno policy in `/kyverno/validate-<name>-fields.yaml`
-5. Update ArgoCD to watch new resource (if needed)
+3. Add Kyverno policy in `/kyverno/validate-<name>-fields.yaml`, plus the RBAC
+   aggregation ClusterRole in `/kyverno/rbac-<name>.yaml` so background scanning
+   can read the new kind
+
+Either way, no Argo CD change is needed: the `crossplane-system` ApplicationSet
+syncs the whole `crossplane/xrds`, `crossplane/compositions` and `crossplane/xrs`
+trees with `directory.recurse`. No Backstage template is needed either --
+kubernetes-ingestor emits a scaffolder `Template` and an `API` entity per XRD, so
+the XRD's field descriptions and enums *are* the form. If the composition
+references a provider that is not installed, add it under `crossplane/providers`
+first.
 
 ### Modifying Bootstrap Process
 
@@ -305,6 +333,17 @@ kyverno apply ./kyverno --resource ./crossplane/xrs
 # Test against a specific XR
 kyverno apply ./kyverno --resource ./crossplane/xrs/my-queue.yaml
 ```
+
+### Testing the XRD/Composition Factory
+
+```bash
+make factory-test    # or: python3 tools/factory/test_factory.py
+```
+
+40 tests, stdlib `unittest`, no cluster needed. Two of them assert the factory
+still reproduces the hand-written `XQueue` and `XMicroservice` manifests from
+`tools/factory/examples/` -- if those fail, the factory has drifted from the
+idioms the stack actually runs.
 
 ### Testing Crossplane Compositions
 

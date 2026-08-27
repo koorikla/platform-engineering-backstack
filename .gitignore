@@ -28,3 +28,7 @@ Thumbs.db
 
 # Personal Claude Code settings (permissions etc.) - not for the shared repo
 .claude/settings.local.json
+
+# Python bytecode (tools/factory)
+__pycache__/
+*.py[cod]

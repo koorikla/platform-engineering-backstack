@@ -275,6 +275,35 @@ creation, the `argocd` CLI bootstrap, secret templating from `.env`, and the
 Crossplane/Kyverno readiness polling have no Skaffold equivalent and stay in
 `make up` and `.bootstrap/*/up.sh`.
 
+### Adding a Platform API (optional)
+
+A new platform API is five files that always look the same: a Crossplane v2
+XRD, a Composition whose body is a `function-go-templating` step followed by
+`function-auto-ready`, a Kyverno policy restating the schema bounds for CI, the
+RBAC that lets Kyverno's background scanner read the new kind, and an example XR.
+
+`tools/factory/` generates all five from one spec:
+
+```sh
+python3 tools/factory/crossplane_factory.py new XBucket --group platform.hooli.tech \
+  > tools/factory/examples/xbucket.yaml
+# edit the spec, then look before you leap
+make new-api SPEC=tools/factory/examples/xbucket.yaml ARGS="--dry-run"
+make new-api SPEC=tools/factory/examples/xbucket.yaml
+```
+
+It emits the same idioms the hand-written `XQueue` and `XMicroservice` use — the
+`{{- with }}` guard on every optional field, the namespaced `.m.upbound.io`
+managed resource a namespaced XR needs, the readiness annotation a Deployment
+needs because it reports `Available` rather than `Ready`. Those two manifests are
+also checked in as factory specs, and `make factory-test` asserts the generator
+still reproduces them. Spec format and the full list of expression forms are in
+[`tools/factory/README.md`](tools/factory/README.md).
+
+Nothing else needs wiring: the `crossplane-system` ApplicationSet already syncs
+the whole `crossplane/xrds` and `crossplane/compositions` trees, and
+kubernetes-ingestor turns each XRD into a Backstage scaffolder form.
+
 ### Progressive Delivery (Kargo)
 
 Kargo watches the [podinfo](https://github.com/stefanprodan/podinfo) image and
